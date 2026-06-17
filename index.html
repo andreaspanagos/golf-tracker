@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Golf">
+<title>Golf Tracker</title>
+<style>
+  :root {
+    --bg: #0d1a0d;
+    --surface: #132013;
+    --surface2: #1a2e1a;
+    --border: #243824;
+    --green: #4caf6c;
+    --green-dim: #2a5c3a;
+    --green-bright: #6ddb8a;
+    --red: #e05555;
+    --amber: #e0a040;
+    --text: #dff0df;
+    --text-dim: #7a9e7a;
+    --text-muted: #4a6a4a;
+    --birdie: #4caf6c;
+    --eagle: #6ddb8a;
+    --bogey: #e0a040;
+    --double: #e05555;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --safe-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; min-height: 100dvh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 52px 20px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-title { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  .header-sub { font-size: 13px; color: var(--text-dim); margin-top: 1px; }
+  .btn-icon {
+    width: 36px; height: 36px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .btn-icon:active { opacity: 0.6; }
+
+  /* ── SCROLLABLE BODY ── */
+  .screen-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    padding-bottom: calc(20px + var(--safe-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    letter-spacing: -0.2px;
+  }
+  .btn:active { opacity: 0.7; }
+  .btn-primary { background: var(--green); color: #0d1a0d; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: #2a1414; color: var(--red); border: 1px solid #3a2020; }
+
+  /* ── CARDS / SECTIONS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .card-row:last-child { border-bottom: none; }
+  .card-row:active { background: var(--surface2); }
+  .card-label { font-size: 15px; color: var(--text); }
+  .card-value { font-size: 15px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
+  .card-chevron { color: var(--text-muted); font-size: 12px; }
+
+  /* ── FORM ELEMENTS ── */
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .form-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 13px 14px;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    -webkit-appearance: none;
+  }
+  .form-input:focus { border-color: var(--green-dim); }
+  select.form-input { cursor: pointer; }
+
+  /* ── STAT GRID ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; color: var(--green-bright); }
+  .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ── COUNTER ── */
+  .counter {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .counter-btn {
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    color: var(--text);
+    cursor: pointer;
+    background: var(--surface2);
+    border: none;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .counter-btn:active { background: var(--border); }
+  .counter-val {
+    flex: 1;
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+
+  /* ── TOGGLE GRID ── */
+  .toggle-grid {
+    display: grid;
+    gap: 8px;
+  }
+  .toggle-grid-2 { grid-template-columns: 1fr 1fr; }
+  .toggle-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .toggle-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .toggle-btn {
+    padding: 11px 6px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.12s;
+    user-select: none;
+    line-height: 1.2;
+  }
+  .toggle-btn:active { opacity: 0.7; }
+  .toggle-btn.selected {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green-bright);
+    font-weight: 600;
+  }
+
+  /* ── HOLE HEADER ── */
+  .hole-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .hole-num {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1;
+    color: var(--green-bright);
+  }
+  .hole-info { text-align: right; }
+  .hole-par { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+  .hole-dist { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .hole-progress {
+    display: flex;
+    gap: 3px;
+    padding: 10px 20px 0;
+  }
+  .hole-pip {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .hole-pip.done { background: var(--green); }
+  .hole-pip.current { background: var(--green-bright); }
+
+  /* ── SCORE INDICATOR ── */
+  .score-indicator {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--text-dim);
+  }
+  .score-indicator.eagle { background: #1a3a1a; color: var(--eagle); }
+  .score-indicator.birdie { background: #1a2e1a; color: var(--birdie); }
+  .score-indicator.par { background: var(--surface2); color: var(--text-dim); }
+  .score-indicator.bogey { background: #2e2a14; color: var(--bogey); }
+  .score-indicator.double { background: #2a1414; color: var(--double); }
+  .score-indicator.worse { background: #2a1414; color: var(--double); }
+
+  /* ── SHOT LOG ── */
+  .shot-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+  }
+  .shot-log-header:active { background: var(--surface2); }
+  .shot-log-label { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+  .shot-log-arrow { color: var(--text-muted); transition: transform 0.2s; font-size: 12px; }
+  .shot-log-arrow.open { transform: rotate(90deg); }
+
+  .shot-entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+  .shot-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .shot-num { font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .shot-delete { font-size: 18px; color: var(--text-muted); cursor: pointer; padding: 2px 6px; }
+  .shot-delete:active { color: var(--red); }
+
+  /* ── SCORECARD ── */
+  .scorecard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .scorecard-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .scorecard-table th {
+    padding: 8px 6px;
+    text-align: center;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .scorecard-table td {
+    padding: 8px 6px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .scorecard-table tr:last-child td { border-bottom: none; }
+  .sc-score { font-weight: 700; }
+  .sc-eagle { color: var(--eagle); }
+  .sc-birdie { color: var(--birdie); }
+  .sc-bogey { color: var(--bogey); }
+  .sc-double { color: var(--double); }
+  .sc-out-row td { background: var(--surface2); font-weight: 700; color: var(--text-dim); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-size: 15px; line-height: 1.5; }
+
+  /* ── SECTION TITLE ── */
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* ── BOTTOM NAV AREA ── */
+  .bottom-actions {
+    padding: 16px 20px;
+    padding-bottom: calc(16px + var(--safe-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: flex-end;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-height: 85dvh;
+    overflow-y: auto;
+    padding: 20px;
+    padding-bottom: calc(20px + var(--safe-bottom));
+  }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* ── TAG ── */
+  .tag {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ── HOLE SETUP TABLE ── */
+  .hole-setup-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .hole-setup-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .form-input-sm {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    -webkit-appearance: none;
+    text-align: center;
+  }
+  .form-input-sm:focus { border-color: var(--green-dim); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: calc(80px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--green);
+    color: #0d1a0d;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 20px;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 200;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── COURSE LIST ITEM ── */
+  .course-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .course-item:active { background: var(--surface2); }
+  .course-item-name { font-size: 15px; font-weight: 600; }
+  .course-item-meta { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .course-item-actions { display: flex; gap: 8px; }
+  .icon-btn { font-size: 18px; padding: 4px 8px; cursor: pointer; color: var(--text-muted); }
+  .icon-btn:active { color: var(--text); }
+
+  /* ── ROUND HISTORY ITEM ── */
+  .round-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .round-item:active { background: var(--surface2); }
+  .round-item-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .round-item-course { font-size: 15px; font-weight: 600; }
+  .round-item-date { font-size: 12px; color: var(--text-muted); }
+  .round-item-score { font-size: 28px; font-weight: 800; letter-spacing: -1px; color: var(--green-bright); }
+  .round-item-stats { display: flex; gap: 12px; margin-top: 8px; }
+  .round-item-stat { font-size: 12px; color: var(--text-dim); }
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: HOME
+══════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="header">
+    <div>
+      <div class="header-title">⛳ Golf Tracker</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="btn-icon" onclick="showScreen('screen-courses')" title="Courses">🏌️</div>
+      <div class="btn-icon" onclick="showScreen('screen-settings')" title="Settings">⚙️</div>
+    </div>
+  </div>
+  <div class="screen-body">
+    <div id="home-stats"></div>
+    <div class="section-title">Recent Rounds</div>
+    <div id="home-rounds"></div>
+  </div>
+  <div class="bottom-actions">
+    <button class="btn btn-primary" onclick="showScreen('screen-round-setup')">Start Round</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: COURSES
+══════════════════════════════════════════ -->
+<div id="screen-courses" class="screen">
+  <div class="header">
+    <div class="btn-icon" onclick="showScreen('screen-home')">←</div>
+    <div class="header-title">Courses</div>
+    <div class="btn-icon" onclick="openAddCourse()">+</div>
+  </div>
+  <div class="screen-body">
+    <div id="courses-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: ROUND SETUP
+══════════════════════════════════════════ -->
+<div id="screen-round-setup" class="screen">
+  <div class="header">
+    <div class="btn-icon" onclick="showScreen('screen-home')">←</div>
+    <div class="header-title">New Round</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="screen-body">
+    <div class="form-group">
+      <label class="form-label">Course</label>
+      <select id="round-course" class="form-input" onchange="onCourseChange()">
+        <option value="">Select course...</option>
+      </select>
+    </div>
+    <div class="form-group" id="tee-group" style="display:none">
+      <label class="form-label">Tee</label>
+      <select id="round-tee" class="form-input">
+        <option value="yellow">Yellow</option>
+        <option value="white">White</option>
+        <option value="blue">Blue</option>
+        <option value="red">Red</option>
+        <option value="gold">Gold</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input id="round-date" type="date" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Weather</label>
+      <div class="toggle-grid toggle-grid-4">
+        <button class="toggle-btn" data-group="weather" data-val="sunny" onclick="selectToggle(this)">☀️ Sun</button>
+        <button class="toggle-btn" data-group="weather" data-val="cloudy" onclick="selectToggle(this)">☁️ Cloud</button>
+        <button class="toggle-btn" data-group="weather" data-val="windy" onclick="selectToggle(this)">💨 Wind</button>
+        <button class="toggle-btn" data-group="weather" data-val="rain" onclick="selectToggle(this)">🌧️ Rain</button>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn btn-secondary" onclick="openAddCourse()" style="font-size:14px;padding:12px">+ Add New Course</button>
+    </div>
+  </div>
+  <div class="bottom-actions">
+    <button class="btn btn-primary" onclick="startRound()">Tee Off →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: HOLE TRACKER
+══════════════════════════════════════════ -->
+<div id="screen-hole" class="screen">
+  <div class="hole-progress" id="hole-progress"></div>
+  <div class="header" style="padding-top:12px">
+    <div class="btn-icon" onclick="confirmLeaveRound()">✕</div>
+    <div style="text-align:center">
+      <div class="header-title" id="hole-course-name">Course</div>
+      <div class="header-sub" id="hole-round-score">Score: E</div>
+    </div>
+    <div id="hole-score-badge" class="score-indicator">—</div>
+  </div>
+  <div class="screen-body">
+    <!-- Hole header -->
+    <div class="hole-header">
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Hole</div>
+        <div class="hole-num" id="hole-num-display">1</div>
+      </div>
+      <div class="hole-info">
+        <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Par</div>
+        <div class="hole-par" id="hole-par-display">4</div>
+        <div class="hole-dist" id="hole-dist-display">—</div>
+      </div>
+    </div>
+
+    <!-- Strokes -->
+    <div class="form-group">
+      <label class="form-label">Strokes</label>
+      <div class="counter">
+        <button class="counter-btn" onclick="adjustCounter('strokes', -1)">−</button>
+        <div class="counter-val" id="strokes-val">0</div>
+        <button class="counter-btn" onclick="adjustCounter('strokes', 1)">+</button>
+      </div>
+    </div>
+
+    <!-- Putts -->
+    <div class="form-group">
+      <label class="form-label">Putts</label>
+      <div class="counter">
+        <button class="counter-btn" onclick="adjustCounter('putts', -1)">−</button>
+        <div class="counter-val" id="putts-val">0</div>
+        <button class="counter-btn" onclick="adjustCounter('putts', 1)">+</button>
+      </div>
+    </div>
+
+    <!-- FIR / GIR -->
+    <div class="two-col form-group">
+      <div>
+        <label class="form-label">Fairway</label>
+        <div class="toggle-grid toggle-grid-2">
+          <button class="toggle-btn" id="fir-yes" onclick="setFIR(true)">✓ Hit</button>
+          <button class="toggle-btn" id="fir-no" onclick="setFIR(false)">✗ Miss</button>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Green in Reg</label>
+        <div class="toggle-grid toggle-grid-2">
+          <button class="toggle-btn" id="gir-yes" onclick="setGIR(true)">✓ Hit</button>
+          <button class="toggle-btn" id="gir-no" onclick="setGIR(false)">✗ Miss</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shot log (collapsible) -->
+    <div class="shot-log-header" onclick="toggleShotLog()">
+      <span class="shot-log-label" id="shot-log-count">Shot Log — tap to expand</span>
+      <span class="shot-log-arrow" id="shot-log-arrow">▶</span>
+    </div>
+    <div id="shot-log-body" style="display:none">
+      <div id="shots-list"></div>
+      <button class="btn btn-secondary" onclick="addShot()" style="font-size:14px;padding:12px;margin-top:4px">+ Add Shot</button>
+    </div>
+
+    <!-- Notes -->
+    <div class="form-group" style="margin-top:12px">
+      <label class="form-label">Notes (optional)</label>
+      <input id="hole-note" type="text" class="form-input" placeholder="e.g. 3-putted from 8m…">
+    </div>
+
+  </div>
+  <div class="bottom-actions">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn btn-secondary" id="btn-prev-hole" onclick="prevHole()">← Prev</button>
+      <button class="btn btn-primary" id="btn-next-hole" onclick="nextHole()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: ROUND SUMMARY
+══════════════════════════════════════════ -->
+<div id="screen-summary" class="screen">
+  <div class="header">
+    <div style="width:36px"></div>
+    <div class="header-title">Round Complete</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="screen-body">
+    <div id="summary-content"></div>
+  </div>
+  <div class="bottom-actions">
+    <button class="btn btn-primary" onclick="finishRound()">Save & Finish</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: SETTINGS
+══════════════════════════════════════════ -->
+<div id="screen-settings" class="screen">
+  <div class="header">
+    <div class="btn-icon" onclick="showScreen('screen-home')">←</div>
+    <div class="header-title">Settings</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="screen-body">
+    <div class="section-title">My Bag</div>
+    <div id="clubs-list"></div>
+    <button class="btn btn-secondary" onclick="openAddClub()" style="margin-top:8px;font-size:14px;padding:12px">+ Add Club</button>
+    <div class="section-title" style="margin-top:24px">Player</div>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input id="settings-name" type="text" class="form-input" placeholder="Your name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Current Handicap Index</label>
+      <input id="settings-hcp" type="number" step="0.1" class="form-input" placeholder="e.g. 12.4">
+    </div>
+    <button class="btn btn-secondary" onclick="saveSettings()" style="margin-top:4px">Save</button>
+
+    <div class="section-title" style="margin-top:24px">Data</div>
+    <button class="btn btn-danger" onclick="confirmClearData()">Clear All Data</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: ADD / EDIT COURSE
+══════════════════════════════════════════ -->
+<div id="modal-course" class="modal-overlay" onclick="closeModalOnBg(event,'modal-course')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-course-title">Add Course</div>
+    <div class="form-group">
+      <label class="form-label">Course Name</label>
+      <input id="course-name-input" type="text" class="form-input" placeholder="e.g. Ullna Golf">
+    </div>
+    <div class="section-title">Holes (Par · Distance m)</div>
+    <div id="holes-setup-grid"></div>
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" onclick="saveCourse()">Save Course</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: ADD SHOT
+══════════════════════════════════════════ -->
+<div id="modal-shot" class="modal-overlay" onclick="closeModalOnBg(event,'modal-shot')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-shot-title">Shot 1</div>
+    <div class="form-group">
+      <label class="form-label">Club</label>
+      <div class="toggle-grid toggle-grid-3" id="shot-club-grid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Result</label>
+      <div class="toggle-grid toggle-grid-3" id="shot-result-grid">
+        <button class="toggle-btn" data-group="shot-result" data-val="Fairway" onclick="selectToggle(this)">Fairway</button>
+        <button class="toggle-btn" data-group="shot-result" data-val="Rough" onclick="selectToggle(this)">Rough</button>
+        <button class="toggle-btn" data-group="shot-result" data-val="Bunker" onclick="selectToggle(this)">Bunker</button>
+        <button class="toggle-btn" data-group="shot-result" data-val="Green" onclick="selectToggle(this)">Green</button>
+        <button class="toggle-btn" data-group="shot-result" data-val="Water" onclick="selectToggle(this)">Water</button>
+        <button class="toggle-btn" data-group="shot-result" data-val="OB" onclick="selectToggle(this)">OB</button>
+        <button class="toggle-btn" data-group="shot-result" data-val="Woods" onclick="selectToggle(this)">Woods</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Miss Direction</label>
+      <div class="toggle-grid toggle-grid-3" id="shot-miss-grid">
+        <button class="toggle-btn" data-group="shot-miss" data-val="Left" onclick="selectToggle(this)">← Left</button>
+        <button class="toggle-btn" data-group="shot-miss" data-val="Right" onclick="selectToggle(this)">Right →</button>
+        <button class="toggle-btn" data-group="shot-miss" data-val="Long" onclick="selectToggle(this)">Long ↑</button>
+        <button class="toggle-btn" data-group="shot-miss" data-val="Short" onclick="selectToggle(this)">Short ↓</button>
+        <button class="toggle-btn" data-group="shot-miss" data-val="Topped/Thin" onclick="selectToggle(this)">Topped</button>
+        <button class="toggle-btn" data-group="shot-miss" data-val="Fat/Heavy" onclick="selectToggle(this)">Fat</button>
+      </div>
+    </div>
+    <div style="margin-top:4px">
+      <button class="btn btn-primary" onclick="saveShot()">Save Shot</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: ADD CLUB
+══════════════════════════════════════════ -->
+<div id="modal-club" class="modal-overlay" onclick="closeModalOnBg(event,'modal-club')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Add Club</div>
+    <div class="form-group">
+      <label class="form-label">Club Name</label>
+      <input id="new-club-input" type="text" class="form-input" placeholder="e.g. 3i, 60°, Hybrid-5…">
+    </div>
+    <button class="btn btn-primary" onclick="saveNewClub()">Add to Bag</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+// STATE & STORAGE
+// ════════════════════════════════════════════
+
+const DB_KEY = {
+  courses: 'gt_courses',
+  rounds: 'gt_rounds',
+  settings: 'gt_settings',
+};
+
+function load(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; }
+}
+function loadObj(key, def = {}) {
+  try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; }
+}
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+// Active round state
+let activeRound = null;  // { courseId, tee, date, weather, holes: [] }
+let currentHoleIdx = 0;
+let editingCourseId = null;
+let editingShotIdx = null;
+
+// ════════════════════════════════════════════
+// DEFAULT CLUBS
+// ════════════════════════════════════════════
+
+function getSettings() {
+  return loadObj(DB_KEY.settings, {
+    name: '',
+    handicap: '',
+    clubs: ['Driver','3W','Hybrid-4','5i','6i','7i','8i','9i','PW','54','58','Putter']
+  });
+}
+
+// ════════════════════════════════════════════
+// SCREEN NAVIGATION
+// ════════════════════════════════════════════
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+  if (id === 'screen-home') renderHome();
+  if (id === 'screen-courses') renderCourses();
+  if (id === 'screen-settings') renderSettings();
+  if (id === 'screen-round-setup') renderRoundSetup();
+}
+
+// ════════════════════════════════════════════
+// HOME SCREEN
+// ════════════════════════════════════════════
+
+function renderHome() {
+  const rounds = load(DB_KEY.rounds);
+  const settings = getSettings();
+  const statsEl = document.getElementById('home-stats');
+  const roundsEl = document.getElementById('home-rounds');
+
+  // Stats
+  if (rounds.length === 0) {
+    statsEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⛳</div>
+        <div class="empty-text">No rounds yet.<br>Add a course and tee off.</div>
+      </div>`;
+    roundsEl.innerHTML = '';
+    return;
+  }
+
+  const last10 = rounds.slice(-10);
+  const avgScore = (last10.reduce((s, r) => s + r.totalScore, 0) / last10.length).toFixed(1);
+  const avgPutts = (last10.reduce((s, r) => s + r.totalPutts, 0) / last10.length).toFixed(1);
+  const girPct = Math.round(last10.reduce((s, r) => s + (r.girCount || 0), 0) / (last10.length * 18) * 100);
+  const firPct = Math.round(last10.reduce((s, r) => s + (r.firCount || 0), 0) / (last10.length * 14) * 100);
+
+  statsEl.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">${settings.handicap || '—'}</div>
+        <div class="stat-label">Handicap</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${avgScore}</div>
+        <div class="stat-label">Avg Score (L${last10.length})</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${avgPutts}</div>
+        <div class="stat-label">Putts / Round</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${girPct}%</div>
+        <div class="stat-label">GIR %</div>
+      </div>
+    </div>`;
+
+  // Recent rounds
+  const recent = [...rounds].reverse().slice(0, 10);
+  const courses = load(DB_KEY.courses);
+  roundsEl.innerHTML = recent.map(r => {
+    const course = courses.find(c => c.id === r.courseId);
+    const courseName = course ? course.name : 'Unknown Course';
+    const coursePar = course ? course.holes.reduce((s, h) => s + h.par, 0) : 72;
+    const diff = r.totalScore - coursePar;
+    const diffStr = diff === 0 ? 'E' : (diff > 0 ? `+${diff}` : `${diff}`);
+    const d = new Date(r.date);
+    const dateStr = d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+    return `
+      <div class="round-item" onclick="viewRound('${r.id}')">
+        <div class="round-item-top">
+          <div>
+            <div class="round-item-course">${courseName}</div>
+            <div class="round-item-date">${dateStr} · ${r.tee} tee${r.weather ? ' · ' + r.weather : ''}</div>
+          </div>
+          <div>
+            <div class="round-item-score">${r.totalScore}</div>
+            <div style="text-align:right;font-size:12px;color:var(--text-dim)">${diffStr}</div>
+          </div>
+        </div>
+        <div class="round-item-stats">
+          <span class="round-item-stat">⛳ ${r.totalPutts} putts</span>
+          <span class="round-item-stat">🎯 ${r.girCount || 0} GIR</span>
+          <span class="round-item-stat">🏁 ${r.firCount || 0} FIR</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function viewRound(id) {
+  const rounds = load(DB_KEY.rounds);
+  const round = rounds.find(r => r.id === id);
+  if (!round) return;
+  const courses = load(DB_KEY.courses);
+  const course = courses.find(c => c.id === round.courseId);
+  // Render summary for viewing
+  renderSummaryContent(round, course);
+  document.getElementById('screen-summary').querySelector('.bottom-actions').innerHTML =
+    `<button class="btn btn-secondary" onclick="showScreen('screen-home')">← Back</button>`;
+  showScreen('screen-summary');
+}
+
+// ════════════════════════════════════════════
+// COURSES SCREEN
+// ════════════════════════════════════════════
+
+function renderCourses() {
+  const courses = load(DB_KEY.courses);
+  const el = document.getElementById('courses-list');
+  if (courses.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏌️</div><div class="empty-text">No courses yet.<br>Tap + to add your first course.</div></div>`;
+    return;
+  }
+  el.innerHTML = courses.map(c => {
+    const par = c.holes.reduce((s, h) => s + h.par, 0);
+    const dist = c.holes.reduce((s, h) => s + (h.dist || 0), 0);
+    return `
+      <div class="course-item">
+        <div onclick="openEditCourse('${c.id}')" style="flex:1">
+          <div class="course-item-name">${c.name}</div>
+          <div class="course-item-meta">Par ${par} · ${dist}m</div>
+        </div>
+        <div class="course-item-actions">
+          <span class="icon-btn" onclick="editCourse('${c.id}')">✏️</span>
+          <span class="icon-btn" onclick="deleteCourse('${c.id}')">🗑️</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function editCourse(id) { openAddCourse(id); }
+
+function deleteCourse(id) {
+  if (!confirm('Delete this course?')) return;
+  let courses = load(DB_KEY.courses);
+  courses = courses.filter(c => c.id !== id);
+  save(DB_KEY.courses, courses);
+  renderCourses();
+  showToast('Course deleted');
+}
+
+// ════════════════════════════════════════════
+// ADD / EDIT COURSE MODAL
+// ════════════════════════════════════════════
+
+function openAddCourse(id = null) {
+  editingCourseId = id;
+  const modal = document.getElementById('modal-course');
+  const title = document.getElementById('modal-course-title');
+  const grid = document.getElementById('holes-setup-grid');
+  const nameInput = document.getElementById('course-name-input');
+
+  let existingCourse = null;
+  if (id) {
+    const courses = load(DB_KEY.courses);
+    existingCourse = courses.find(c => c.id === id);
+  }
+
+  title.textContent = id ? 'Edit Course' : 'Add Course';
+  nameInput.value = existingCourse ? existingCourse.name : '';
+
+  grid.innerHTML = Array.from({length: 18}, (_, i) => {
+    const h = existingCourse ? existingCourse.holes[i] : null;
+    return `
+      <div class="hole-setup-row">
+        <div class="hole-setup-num">${i + 1}</div>
+        <input class="form-input-sm" type="number" id="h-par-${i}" placeholder="Par" min="3" max="5" value="${h ? h.par : ''}">
+        <input class="form-input-sm" type="number" id="h-dist-${i}" placeholder="Dist (m)" value="${h ? (h.dist || '') : ''}">
+      </div>`;
+  }).join('');
+
+  modal.classList.add('active');
+}
+
+function saveCourse() {
+  const name = document.getElementById('course-name-input').value.trim();
+  if (!name) { alert('Enter a course name.'); return; }
+
+  const holes = [];
+  for (let i = 0; i < 18; i++) {
+    const par = parseInt(document.getElementById(`h-par-${i}`).value) || 4;
+    const dist = parseInt(document.getElementById(`h-dist-${i}`).value) || 0;
+    holes.push({ par, dist });
+  }
+
+  let courses = load(DB_KEY.courses);
+  if (editingCourseId) {
+    courses = courses.map(c => c.id === editingCourseId ? { ...c, name, holes } : c);
+    showToast('Course updated');
+  } else {
+    courses.push({ id: 'c_' + Date.now(), name, holes });
+    showToast('Course added');
+  }
+  save(DB_KEY.courses, courses);
+
+  document.getElementById('modal-course').classList.remove('active');
+  renderCourses();
+  renderRoundSetup(); // refresh dropdown
+}
+
+// ════════════════════════════════════════════
+// ROUND SETUP SCREEN
+// ════════════════════════════════════════════
+
+function renderRoundSetup() {
+  const courses = load(DB_KEY.courses);
+  const sel = document.getElementById('round-course');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select course...</option>' +
+    courses.map(c => `<option value="${c.id}"${c.id === current ? ' selected' : ''}>${c.name}</option>`).join('');
+
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('round-date').value = today;
+
+  onCourseChange();
+}
+
+function onCourseChange() {
+  const val = document.getElementById('round-course').value;
+  document.getElementById('tee-group').style.display = val ? 'block' : 'none';
+}
+
+function startRound() {
+  const courseId = document.getElementById('round-course').value;
+  if (!courseId) { showToast('Select a course first'); return; }
+
+  const courses = load(DB_KEY.courses);
+  const course = courses.find(c => c.id === courseId);
+  if (!course) return;
+
+  const tee = document.getElementById('round-tee').value;
+  const date = document.getElementById('round-date').value;
+  const weather = document.querySelector('.toggle-btn.selected[data-group="weather"]')?.dataset.val || '';
+
+  // Init active round
+  activeRound = {
+    id: 'r_' + Date.now(),
+    courseId,
+    tee,
+    date,
+    weather,
+    holes: Array.from({length: 18}, (_, i) => ({
+      holeNum: i + 1,
+      strokes: 0,
+      putts: 0,
+      fir: null,
+      gir: null,
+      shots: [],
+      note: ''
+    }))
+  };
+
+  currentHoleIdx = 0;
+  loadHole(0);
+  showScreen('screen-hole');
+}
+
+// ════════════════════════════════════════════
+// HOLE TRACKER
+// ════════════════════════════════════════════
+
+function loadHole(idx) {
+  const courses = load(DB_KEY.courses);
+  const course = courses.find(c => c.id === activeRound.courseId);
+  const holeData = course.holes[idx];
+  const holeState = activeRound.holes[idx];
+
+  // Update header
+  document.getElementById('hole-course-name').textContent = course.name;
+  document.getElementById('hole-num-display').textContent = idx + 1;
+  document.getElementById('hole-par-display').textContent = holeData.par;
+  document.getElementById('hole-dist-display').textContent = holeData.dist ? `${holeData.dist}m` : '—';
+
+  // Running score
+  const totalStrokes = activeRound.holes.slice(0, idx).reduce((s, h) => s + h.strokes, 0);
+  const totalPar = course.holes.slice(0, idx).reduce((s, h) => s + h.par, 0);
+  const diff = totalStrokes - totalPar;
+  document.getElementById('hole-round-score').textContent = `Round: ${diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff)}`;
+
+  // Counters
+  document.getElementById('strokes-val').textContent = holeState.strokes;
+  document.getElementById('putts-val').textContent = holeState.putts;
+
+  // FIR/GIR toggles
+  updateFIRGIR(holeData.par, holeState);
+
+  // Score badge
+  updateScoreBadge(holeState.strokes, holeData.par);
+
+  // Shot log
+  document.getElementById('shot-log-body').style.display = 'none';
+  document.getElementById('shot-log-arrow').classList.remove('open');
+  renderShotList();
+  updateShotLogCount();
+
+  // Note
+  document.getElementById('hole-note').value = holeState.note || '';
+
+  // Nav buttons
+  document.getElementById('btn-prev-hole').disabled = idx === 0;
+  document.getElementById('btn-next-hole').textContent = idx === 17 ? 'Finish →' : 'Next →';
+
+  // Progress pips
+  renderProgress();
+}
+
+function renderProgress() {
+  const el = document.getElementById('hole-progress');
+  el.innerHTML = Array.from({length: 18}, (_, i) => {
+    let cls = '';
+    if (i < currentHoleIdx) cls = 'done';
+    if (i === currentHoleIdx) cls = 'current';
+    return `<div class="hole-pip ${cls}"></div>`;
+  }).join('');
+}
+
+function updateFIRGIR(par, holeState) {
+  const firContainer = document.querySelector('.two-col .form-group:first-child');
+  // Hide FIR for par 3s
+  firContainer.style.visibility = par === 3 ? 'hidden' : 'visible';
+
+  document.getElementById('fir-yes').classList.toggle('selected', holeState.fir === true);
+  document.getElementById('fir-no').classList.toggle('selected', holeState.fir === false);
+  document.getElementById('gir-yes').classList.toggle('selected', holeState.gir === true);
+  document.getElementById('gir-no').classList.toggle('selected', holeState.gir === false);
+}
+
+function adjustCounter(type, delta) {
+  const hole = activeRound.holes[currentHoleIdx];
+  if (type === 'strokes') {
+    hole.strokes = Math.max(0, hole.strokes + delta);
+    document.getElementById('strokes-val').textContent = hole.strokes;
+    const courses = load(DB_KEY.courses);
+    const course = courses.find(c => c.id === activeRound.courseId);
+    updateScoreBadge(hole.strokes, course.holes[currentHoleIdx].par);
+  } else {
+    hole.putts = Math.max(0, hole.putts + delta);
+    document.getElementById('putts-val').textContent = hole.putts;
+  }
+}
+
+function setFIR(val) {
+  activeRound.holes[currentHoleIdx].fir = val;
+  document.getElementById('fir-yes').classList.toggle('selected', val === true);
+  document.getElementById('fir-no').classList.toggle('selected', val === false);
+}
+
+function setGIR(val) {
+  activeRound.holes[currentHoleIdx].gir = val;
+  document.getElementById('gir-yes').classList.toggle('selected', val === true);
+  document.getElementById('gir-no').classList.toggle('selected', val === false);
+}
+
+function updateScoreBadge(strokes, par) {
+  const badge = document.getElementById('hole-score-badge');
+  if (strokes === 0) { badge.textContent = '—'; badge.className = 'score-indicator'; return; }
+  const diff = strokes - par;
+  const labels = { '-2': ['Eagle', 'eagle'], '-1': ['Birdie', 'birdie'], '0': ['Par', 'par'], '1': ['Bogey', 'bogey'], '2': ['Double', 'double'] };
+  const entry = labels[diff] || (diff > 2 ? ['+'+(diff)+' Bogey','worse'] : ['Albatross','eagle']);
+  badge.textContent = entry[0];
+  badge.className = 'score-indicator ' + entry[1];
+}
+
+function saveCurrentHole() {
+  activeRound.holes[currentHoleIdx].note = document.getElementById('hole-note').value;
+}
+
+function nextHole() {
+  saveCurrentHole();
+  if (currentHoleIdx === 17) {
+    showSummary();
+    return;
+  }
+  currentHoleIdx++;
+  loadHole(currentHoleIdx);
+}
+
+function prevHole() {
+  if (currentHoleIdx === 0) return;
+  saveCurrentHole();
+  currentHoleIdx--;
+  loadHole(currentHoleIdx);
+}
+
+function confirmLeaveRound() {
+  if (confirm('Leave round? Progress will be lost.')) {
+    activeRound = null;
+    showScreen('screen-home');
+  }
+}
+
+// ════════════════════════════════════════════
+// SHOT LOG
+// ════════════════════════════════════════════
+
+function toggleShotLog() {
+  const body = document.getElementById('shot-log-body');
+  const arrow = document.getElementById('shot-log-arrow');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  arrow.classList.toggle('open', !isOpen);
+}
+
+function renderShotList() {
+  const shots = activeRound.holes[currentHoleIdx].shots;
+  const el = document.getElementById('shots-list');
+  if (shots.length === 0) {
+    el.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No shots logged yet.</div>`;
+    return;
+  }
+  el.innerHTML = shots.map((s, i) => `
+    <div class="shot-entry">
+      <div class="shot-entry-header">
+        <span class="shot-num">Shot ${i + 1}</span>
+        <span class="shot-delete" onclick="deleteShot(${i})">✕</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${s.club ? `<span class="tag">🏌️ ${s.club}</span>` : ''}
+        ${s.result ? `<span class="tag">📍 ${s.result}</span>` : ''}
+        ${s.miss ? `<span class="tag" style="color:var(--amber)">⚠ ${s.miss}</span>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function updateShotLogCount() {
+  const shots = activeRound.holes[currentHoleIdx].shots;
+  const label = document.getElementById('shot-log-count');
+  label.textContent = shots.length > 0
+    ? `Shot Log — ${shots.length} shot${shots.length > 1 ? 's' : ''} logged`
+    : 'Shot Log — tap to expand';
+}
+
+function addShot() {
+  const shots = activeRound.holes[currentHoleIdx].shots;
+  editingShotIdx = null;
+  openShotModal(shots.length + 1);
+}
+
+function openShotModal(num) {
+  const settings = getSettings();
+  const grid = document.getElementById('shot-club-grid');
+  grid.innerHTML = settings.clubs.map(c =>
+    `<button class="toggle-btn" data-group="shot-club" data-val="${c}" onclick="selectToggle(this)">${c}</button>`
+  ).join('');
+
+  // Clear selections
+  document.querySelectorAll('#modal-shot .toggle-btn').forEach(b => b.classList.remove('selected'));
+
+  // Pre-fill if editing
+  if (editingShotIdx !== null) {
+    const shot = activeRound.holes[currentHoleIdx].shots[editingShotIdx];
+    if (shot.club) document.querySelector(`[data-group="shot-club"][data-val="${shot.club}"]`)?.classList.add('selected');
+    if (shot.result) document.querySelector(`[data-group="shot-result"][data-val="${shot.result}"]`)?.classList.add('selected');
+    if (shot.miss) document.querySelector(`[data-group="shot-miss"][data-val="${shot.miss}"]`)?.classList.add('selected');
+  }
+
+  document.getElementById('modal-shot-title').textContent = `Shot ${num}`;
+  document.getElementById('modal-shot').classList.add('active');
+}
+
+function saveShot() {
+  const club = document.querySelector('.toggle-btn.selected[data-group="shot-club"]')?.dataset.val || '';
+  const result = document.querySelector('.toggle-btn.selected[data-group="shot-result"]')?.dataset.val || '';
+  const miss = document.querySelector('.toggle-btn.selected[data-group="shot-miss"]')?.dataset.val || '';
+
+  const shots = activeRound.holes[currentHoleIdx].shots;
+  const shot = { club, result, miss };
+
+  if (editingShotIdx !== null) {
+    shots[editingShotIdx] = shot;
+  } else {
+    shots.push(shot);
+  }
+
+  document.getElementById('modal-shot').classList.remove('active');
+  renderShotList();
+  updateShotLogCount();
+}
+
+function deleteShot(idx) {
+  activeRound.holes[currentHoleIdx].shots.splice(idx, 1);
+  renderShotList();
+  updateShotLogCount();
+}
+
+// ════════════════════════════════════════════
+// ROUND SUMMARY
+// ════════════════════════════════════════════
+
+function showSummary() {
+  const courses = load(DB_KEY.courses);
+  const course = courses.find(c => c.id === activeRound.courseId);
+  renderSummaryContent(activeRound, course);
+  document.getElementById('screen-summary').querySelector('.bottom-actions').innerHTML =
+    `<button class="btn btn-primary" onclick="finishRound()">Save & Finish</button>`;
+  showScreen('screen-summary');
+}
+
+function renderSummaryContent(round, course) {
+  const holes = round.holes || [];
+  const courseHoles = course ? course.holes : holes.map(() => ({ par: 4, dist: 0 }));
+  const totalScore = round.totalScore || holes.reduce((s, h) => s + h.strokes, 0);
+  const totalPutts = round.totalPutts || holes.reduce((s, h) => s + h.putts, 0);
+  const coursePar = courseHoles.reduce((s, h) => s + h.par, 0);
+  const diff = totalScore - coursePar;
+  const diffStr = diff === 0 ? 'E' : (diff > 0 ? `+${diff}` : `${diff}`);
+  const girCount = round.girCount !== undefined ? round.girCount : holes.filter(h => h.gir === true).length;
+  const firCount = round.firCount !== undefined ? round.firCount : holes.filter(h => h.fir === true).length;
+
+  // Scorecard rows
+  const frontNine = holes.slice(0, 9);
+  const backNine = holes.slice(9, 18);
+  const front9Par = courseHoles.slice(0, 9).reduce((s, h) => s + h.par, 0);
+  const back9Par = courseHoles.slice(9, 18).reduce((s, h) => s + h.par, 0);
+  const front9Score = frontNine.reduce((s, h) => s + h.strokes, 0);
+  const back9Score = backNine.reduce((s, h) => s + h.strokes, 0);
+
+  function scoreClass(strokes, par) {
+    if (!strokes) return '';
+    const d = strokes - par;
+    if (d <= -2) return 'sc-eagle';
+    if (d === -1) return 'sc-birdie';
+    if (d === 1) return 'sc-bogey';
+    if (d >= 2) return 'sc-double';
+    return '';
+  }
+
+  function scorecardRows(holeArr, parArr, startIdx) {
+    return holeArr.map((h, i) => `
+      <tr>
+        <td>${startIdx + i + 1}</td>
+        <td>${parArr[i].par}</td>
+        <td>${parArr[i].dist || '—'}</td>
+        <td class="sc-score ${scoreClass(h.strokes, parArr[i].par)}">${h.strokes || '—'}</td>
+        <td>${h.putts || '—'}</td>
+        <td style="font-size:11px">${h.gir === true ? '✓' : h.gir === false ? '✗' : '—'}</td>
+      </tr>`).join('');
+  }
+
+  const d = new Date(round.date || Date.now());
+  const dateStr = d.toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  document.getElementById('summary-content').innerHTML = `
+    <div style="text-align:center;padding:20px 0 16px">
+      <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">${course ? course.name : '—'}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${dateStr}</div>
+      <div style="font-size:72px;font-weight:800;letter-spacing:-4px;color:var(--green-bright);line-height:1;margin:8px 0">${totalScore || '—'}</div>
+      <div style="font-size:24px;color:var(--text-dim);font-weight:600">${diffStr}</div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${totalPutts}</div><div class="stat-label">Putts</div></div>
+      <div class="stat-card"><div class="stat-value">${girCount}/18</div><div class="stat-label">GIR</div></div>
+      <div class="stat-card"><div class="stat-value">${firCount}/14</div><div class="stat-label">FIR</div></div>
+      <div class="stat-card"><div class="stat-value">${coursePar}</div><div class="stat-label">Course Par</div></div>
+    </div>
+    <div class="section-title">Scorecard</div>
+    <div class="scorecard">
+      <table class="scorecard-table">
+        <thead><tr><th>H</th><th>Par</th><th>m</th><th>Score</th><th>Putts</th><th>GIR</th></tr></thead>
+        <tbody>
+          ${scorecardRows(frontNine, courseHoles.slice(0, 9), 0)}
+          <tr class="sc-out-row"><td>OUT</td><td>${front9Par}</td><td>—</td><td>${front9Score || '—'}</td><td>${frontNine.reduce((s,h)=>s+h.putts,0)||'—'}</td><td>—</td></tr>
+          ${scorecardRows(backNine, courseHoles.slice(9, 18), 9)}
+          <tr class="sc-out-row"><td>IN</td><td>${back9Par}</td><td>—</td><td>${back9Score||'—'}</td><td>${backNine.reduce((s,h)=>s+h.putts,0)||'—'}</td><td>—</td></tr>
+          <tr class="sc-out-row"><td>TOT</td><td>${coursePar}</td><td>—</td><td>${totalScore||'—'}</td><td>${totalPutts||'—'}</td><td>${girCount}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function finishRound() {
+  saveCurrentHole();
+  const courses = load(DB_KEY.courses);
+  const course = courses.find(c => c.id === activeRound.courseId);
+  const courseHoles = course ? course.holes : [];
+  const coursePar = courseHoles.reduce((s, h) => s + h.par, 0);
+
+  const totalScore = activeRound.holes.reduce((s, h) => s + h.strokes, 0);
+  const totalPutts = activeRound.holes.reduce((s, h) => s + h.putts, 0);
+  const girCount = activeRound.holes.filter(h => h.gir === true).length;
+  const firCount = activeRound.holes.filter(h => h.fir === true).length;
+
+  const completedRound = {
+    ...activeRound,
+    totalScore,
+    totalPutts,
+    girCount,
+    firCount,
+    coursePar,
+    savedAt: Date.now()
+  };
+
+  const rounds = load(DB_KEY.rounds);
+  rounds.push(completedRound);
+  save(DB_KEY.rounds, rounds);
+
+  activeRound = null;
+  showToast('Round saved! ⛳');
+  showScreen('screen-home');
+}
+
+// ════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════
+
+function renderSettings() {
+  const settings = getSettings();
+  document.getElementById('settings-name').value = settings.name || '';
+  document.getElementById('settings-hcp').value = settings.handicap || '';
+  renderClubList();
+}
+
+function renderClubList() {
+  const settings = getSettings();
+  const el = document.getElementById('clubs-list');
+  el.innerHTML = settings.clubs.map((c, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
+      <span style="font-size:15px">${c}</span>
+      <span class="icon-btn" onclick="deleteClub(${i})">✕</span>
+    </div>`).join('');
+}
+
+function deleteClub(idx) {
+  const settings = getSettings();
+  settings.clubs.splice(idx, 1);
+  save(DB_KEY.settings, settings);
+  renderClubList();
+}
+
+function openAddClub() {
+  document.getElementById('new-club-input').value = '';
+  document.getElementById('modal-club').classList.add('active');
+}
+
+function saveNewClub() {
+  const name = document.getElementById('new-club-input').value.trim();
+  if (!name) return;
+  const settings = getSettings();
+  settings.clubs.push(name);
+  save(DB_KEY.settings, settings);
+  document.getElementById('modal-club').classList.remove('active');
+  renderClubList();
+  showToast('Club added');
+}
+
+function saveSettings() {
+  const settings = getSettings();
+  settings.name = document.getElementById('settings-name').value.trim();
+  settings.handicap = document.getElementById('settings-hcp').value;
+  save(DB_KEY.settings, settings);
+  showToast('Saved');
+}
+
+function confirmClearData() {
+  if (confirm('Delete ALL rounds and courses? This cannot be undone.')) {
+    localStorage.removeItem(DB_KEY.rounds);
+    localStorage.removeItem(DB_KEY.courses);
+    showToast('Data cleared');
+    showScreen('screen-home');
+  }
+}
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+
+function selectToggle(btn) {
+  const group = btn.dataset.group;
+  document.querySelectorAll(`.toggle-btn[data-group="${group}"]`).forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function closeModalOnBg(e, id) {
+  if (e.target === document.getElementById(id)) {
+    document.getElementById(id).classList.remove('active');
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+
+renderHome();
+</script>
+</body>
+</html>
