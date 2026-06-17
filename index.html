@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Golf">
 <title>Golf Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
     --bg: #0d1a0d;
@@ -685,6 +686,102 @@
   .sync-badge.syncing { color: var(--amber); }
   .sync-badge.offline { color: var(--text-muted); }
 
+  /* ── ANALYTICS: PILL TABS ── */
+  .pill-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+  .pill-tab {
+    flex: 1;
+    text-align: center;
+    padding: 9px 4px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.12s;
+  }
+  .pill-tab:active { opacity: 0.7; }
+  .pill-tab.active { background: var(--green-dim); color: var(--green-bright); }
+
+  /* ── ANALYTICS: CHART CARD ── */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .chart-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .chart-card-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* ── ANALYTICS: COURSE ROW ── */
+  .course-stat-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .course-stat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    cursor: pointer;
+  }
+  .course-stat-head:active { background: var(--surface2); }
+  .course-stat-name { font-size: 15px; font-weight: 600; }
+  .course-stat-meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .course-stat-figures { display: flex; gap: 14px; align-items: center; }
+  .course-stat-fig { text-align: center; }
+  .course-stat-fig-val { font-size: 17px; font-weight: 700; color: var(--green-bright); letter-spacing: -0.5px; }
+  .course-stat-fig-lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .course-stat-detail { border-top: 1px solid var(--border); padding: 14px 16px; }
+
+  /* ── ANALYTICS: MINI STAT INLINE ── */
+  .mini-stats { display: flex; gap: 10px; margin-bottom: 12px; }
+  .mini-stat {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    text-align: center;
+  }
+  .mini-stat-val { font-size: 20px; font-weight: 700; color: var(--green-bright); letter-spacing: -0.5px; }
+  .mini-stat-lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+  /* ── ANALYTICS: HOLE HIGHLIGHT TAGS ── */
+  .hole-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .hole-tag {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+  .hole-tag.hard { color: var(--red); border-color: #3a2020; }
+  .hole-tag.easy { color: var(--green-bright); border-color: var(--green-dim); }
+
 </style>
 </head>
 <body>
@@ -739,12 +836,35 @@
 </div>
 
 <!-- ══════════════════════════════════════════
+     SCREEN: ANALYTICS
+══════════════════════════════════════════ -->
+<div id="screen-analytics" class="screen has-tabs">
+  <div class="header">
+    <div class="header-title">Analytics</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="screen-body">
+    <div class="pill-tabs">
+      <div class="pill-tab active" id="atab-trends"  onclick="switchAnalyticsTab('trends')">Trends</div>
+      <div class="pill-tab"        id="atab-misses"  onclick="switchAnalyticsTab('misses')">Misses</div>
+      <div class="pill-tab"        id="atab-courses" onclick="switchAnalyticsTab('courses')">Courses</div>
+      <div class="pill-tab"        id="atab-holes"   onclick="switchAnalyticsTab('holes')">Holes</div>
+    </div>
+    <div id="analytics-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
      TAB BAR
 ══════════════════════════════════════════ -->
 <div class="tab-bar" id="main-tab-bar">
   <div class="tab-item active" id="tab-home" onclick="switchTab('home')">
     <div class="tab-icon">🏠</div>
     <div class="tab-label">Rounds</div>
+  </div>
+  <div class="tab-item" id="tab-analytics" onclick="switchTab('analytics')">
+    <div class="tab-icon">📊</div>
+    <div class="tab-label">Analytics</div>
   </div>
   <div class="tab-item" id="tab-profile" onclick="switchTab('profile')">
     <div class="tab-icon">👤</div>
@@ -1225,6 +1345,7 @@ function renderCurrentScreen() {
   const active = document.querySelector('.screen.active');
   if (!active) return;
   if (active.id === 'screen-home') renderHome();
+  else if (active.id === 'screen-analytics') renderAnalytics();
   else if (active.id === 'screen-profile') renderProfile();
   else if (active.id === 'screen-courses') renderCourses();
   else if (active.id === 'screen-round-setup') renderRoundSetup();
@@ -1274,11 +1395,12 @@ function showScreen(id) {
   window.scrollTo(0, 0);
 
   // Show/hide tab bar — only on tabbed screens
-  const tabbedScreens = ['screen-home', 'screen-profile'];
+  const tabbedScreens = ['screen-home', 'screen-analytics', 'screen-profile'];
   document.getElementById('main-tab-bar').style.display =
     tabbedScreens.includes(id) ? 'flex' : 'none';
 
   if (id === 'screen-home') { renderHome(); setActiveTab('home'); }
+  if (id === 'screen-analytics') { renderAnalytics(); setActiveTab('analytics'); }
   if (id === 'screen-profile') { renderProfile(); setActiveTab('profile'); }
   if (id === 'screen-courses') renderCourses();
   if (id === 'screen-settings') {}
@@ -1287,6 +1409,7 @@ function showScreen(id) {
 
 function switchTab(tab) {
   if (tab === 'home') showScreen('screen-home');
+  if (tab === 'analytics') showScreen('screen-analytics');
   if (tab === 'profile') showScreen('screen-profile');
 }
 
@@ -2173,6 +2296,435 @@ function confirmClearData() {
 }
 
 // ════════════════════════════════════════════
+// ANALYTICS
+// ════════════════════════════════════════════
+
+let analyticsTab = 'trends';
+let analyticsCharts = [];   // live Chart.js instances, destroyed on every re-render
+const AC = {};              // resolved CSS colors for chart styling
+
+function loadChartColors() {
+  const css = getComputedStyle(document.documentElement);
+  ['--bg','--surface','--surface2','--border','--green','--green-dim','--green-bright',
+   '--amber','--red','--text','--text-dim','--text-muted'].forEach(n => AC[n] = css.getPropertyValue(n).trim());
+}
+
+function setupChartDefaults() {
+  if (typeof Chart === 'undefined') return;
+  loadChartColors();
+  Chart.defaults.color = AC['--text-dim'];
+  Chart.defaults.borderColor = AC['--border'];
+  Chart.defaults.font.family = "-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif";
+  Chart.defaults.font.size = 11;
+  Chart.defaults.maintainAspectRatio = false;
+  Chart.defaults.plugins.legend.display = false;
+  Chart.defaults.plugins.legend.labels.boxWidth = 12;
+  Chart.defaults.plugins.legend.labels.boxHeight = 12;
+  Chart.defaults.plugins.tooltip.backgroundColor = AC['--surface2'];
+  Chart.defaults.plugins.tooltip.borderColor = AC['--border'];
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.titleColor = AC['--text'];
+  Chart.defaults.plugins.tooltip.bodyColor = AC['--text-dim'];
+  Chart.defaults.plugins.tooltip.padding = 8;
+}
+
+function destroyAnalyticsCharts() {
+  analyticsCharts.forEach(c => { try { c.destroy(); } catch (e) {} });
+  analyticsCharts = [];
+}
+
+// Rounds in chronological order (by date, then save time).
+function sortedRounds(rounds) {
+  return [...rounds].sort((a, b) =>
+    (new Date(a.date) - new Date(b.date)) || ((a.savedAt || 0) - (b.savedAt || 0)));
+}
+
+function fmtShortDate(d) {
+  return new Date(d).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' });
+}
+
+function coursePar(round, courses) {
+  if (typeof round.coursePar === 'number' && round.coursePar > 0) return round.coursePar;
+  const c = courses.find(x => x.id === round.courseId);
+  return c ? c.holes.reduce((s, h) => s + h.par, 0) : 72;
+}
+
+// Generic base scale config so every chart picks up theme grid/tick colors.
+function baseScales(extraY) {
+  return {
+    x: { grid: { color: AC['--border'], drawBorder: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } },
+    y: Object.assign({ grid: { color: AC['--border'], drawBorder: false }, ticks: { maxTicksLimit: 6 } }, extraY || {})
+  };
+}
+
+function makeChart(id, config) {
+  const ctx = document.getElementById(id);
+  if (!ctx || typeof Chart === 'undefined') return null;
+  const c = new Chart(ctx, config);
+  analyticsCharts.push(c);
+  return c;
+}
+
+function chartCard(title, sub, canvasId, height) {
+  return `<div class="chart-card">
+      <div class="chart-card-title">${title}</div>
+      ${sub ? `<div class="chart-card-sub">${sub}</div>` : ''}
+      <div class="chart-wrap" style="height:${height || 200}px"><canvas id="${canvasId}"></canvas></div>
+    </div>`;
+}
+
+function analyticsEmptyState() {
+  return `<div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-text">Play a few more rounds to unlock this view</div>
+    </div>`;
+}
+
+function switchAnalyticsTab(tab) {
+  analyticsTab = tab;
+  renderAnalytics();
+}
+
+function setAnalyticsTabUI() {
+  ['trends','misses','courses','holes'].forEach(t =>
+    document.getElementById('atab-' + t)?.classList.toggle('active', t === analyticsTab));
+}
+
+function renderAnalytics() {
+  setAnalyticsTabUI();
+  destroyAnalyticsCharts();
+  const content = document.getElementById('analytics-content');
+  if (!content) return;
+
+  if (typeof Chart === 'undefined') {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div>
+      <div class="empty-text">Charts couldn't load.<br>Check your connection and reopen this tab.</div></div>`;
+    return;
+  }
+
+  const rounds = load(DB_KEY.rounds);
+  if (rounds.length < 3) { content.innerHTML = analyticsEmptyState(); return; }
+
+  if (analyticsTab === 'trends') renderTrendsTab(content, rounds);
+  else if (analyticsTab === 'misses') renderMissesTab(content, rounds);
+  else if (analyticsTab === 'courses') renderCoursesTab(content, rounds);
+  else if (analyticsTab === 'holes') renderHolesTab(content, rounds);
+}
+
+// ── TAB 1: TRENDS ──
+function renderTrendsTab(content, allRounds) {
+  const rounds = sortedRounds(allRounds);
+  const courses = load(DB_KEY.courses);
+
+  // Rolling 5-round average computed over the full history, then sliced.
+  const scores = rounds.map(r => r.totalScore);
+  const rolling = scores.map((_, i) => {
+    const w = scores.slice(Math.max(0, i - 4), i + 1);
+    return +(w.reduce((a, b) => a + b, 0) / w.length).toFixed(1);
+  });
+
+  const n = Math.min(20, rounds.length);
+  const last = rounds.slice(-n);
+  const labels = last.map(r => fmtShortDate(r.date));
+  const scoreData = last.map(r => r.totalScore);
+  const rollData = rolling.slice(-n);
+  const girData = last.map(r => Math.round((r.girCount || 0) / 18 * 100));
+  const firData = last.map(r => Math.round((r.firCount || 0) / 14 * 100));
+  const puttData = last.map(r => r.totalPutts);
+
+  const hcp = [...load(DB_KEY.hcpHistory)]
+    .filter(h => h && h.date)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  content.innerHTML =
+    chartCard('Scoring Average', `Last ${n} rounds with 5-round rolling average`, 'ac-scoring') +
+    (hcp.length
+      ? chartCard('Handicap Index', `${hcp.length} log entr${hcp.length > 1 ? 'ies' : 'y'}`, 'ac-hcp')
+      : `<div class="chart-card"><div class="chart-card-title">Handicap Index</div>
+          <div class="chart-card-sub" style="margin-bottom:0">No handicap logged yet — add entries from Profile.</div></div>`) +
+    chartCard('Greens & Fairways', 'GIR % and FIR % per round', 'ac-girfir') +
+    chartCard('Putts per Round', `Last ${n} rounds`, 'ac-putts');
+
+  makeChart('ac-scoring', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Score', data: scoreData, borderColor: AC['--green-bright'], backgroundColor: AC['--green-bright'],
+        pointRadius: 2, pointHoverRadius: 4, tension: 0.3, borderWidth: 2 },
+      { label: '5-round avg', data: rollData, borderColor: AC['--amber'], backgroundColor: AC['--amber'],
+        pointRadius: 0, tension: 0.3, borderWidth: 2, borderDash: [5, 4] }
+    ] },
+    options: { scales: baseScales(), plugins: { legend: { display: true, position: 'top' } } }
+  });
+
+  if (hcp.length) {
+    makeChart('ac-hcp', {
+      type: 'line',
+      data: { labels: hcp.map(h => fmtShortDate(h.date)), datasets: [
+        { label: 'HCP', data: hcp.map(h => parseFloat(h.val)), borderColor: AC['--green-bright'],
+          backgroundColor: AC['--green-dim'], pointRadius: 3, pointHoverRadius: 5, tension: 0.2, borderWidth: 2, fill: true }
+      ] },
+      options: { scales: baseScales() }
+    });
+  }
+
+  makeChart('ac-girfir', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'GIR %', data: girData, borderColor: AC['--green-bright'], backgroundColor: AC['--green-bright'],
+        pointRadius: 2, pointHoverRadius: 4, tension: 0.3, borderWidth: 2 },
+      { label: 'FIR %', data: firData, borderColor: AC['--amber'], backgroundColor: AC['--amber'],
+        pointRadius: 2, pointHoverRadius: 4, tension: 0.3, borderWidth: 2 }
+    ] },
+    options: {
+      scales: baseScales({ beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } }),
+      plugins: { legend: { display: true, position: 'top' } }
+    }
+  });
+
+  makeChart('ac-putts', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Putts', data: puttData, borderColor: AC['--green-bright'], backgroundColor: AC['--green-dim'],
+        pointRadius: 2, pointHoverRadius: 4, tension: 0.3, borderWidth: 2, fill: true }
+    ] },
+    options: { scales: baseScales() }
+  });
+}
+
+// ── TAB 2: MISSES ──
+const MISS_LABEL = { 'Left': 'Left', 'Right': 'Right', 'Long': 'Long', 'Short': 'Short', 'Topped/Thin': 'Topped', 'Fat/Heavy': 'Fat' };
+const MISS_CATS = ['Left', 'Right', 'Long', 'Short', 'Topped', 'Fat'];
+const BAD_RESULTS = ['Rough', 'Bunker', 'Water', 'OB', 'Woods'];
+
+function collectShots(rounds) {
+  const shots = [];
+  rounds.forEach(r => (r.holes || []).forEach(h => (h.shots || []).forEach(s => { if (s) shots.push(s); })));
+  return shots;
+}
+
+function renderMissesTab(content, rounds) {
+  const shots = collectShots(rounds);
+  const hasMiss = shots.some(s => s.miss);
+  const hasResult = shots.some(s => s.result);
+
+  if (!shots.length || (!hasMiss && !hasResult)) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">🎯</div>
+      <div class="empty-text">No shot details logged yet.<br>Use the Shot Log while playing to track misses.</div></div>`;
+    return;
+  }
+
+  // Miss direction totals
+  const missCounts = {}; MISS_CATS.forEach(c => missCounts[c] = 0);
+  shots.forEach(s => { if (s.miss && MISS_LABEL[s.miss]) missCounts[MISS_LABEL[s.miss]]++; });
+
+  // Most-used clubs (by shots logged with a club)
+  const clubCounts = {};
+  shots.forEach(s => { if (s.club) clubCounts[s.club] = (clubCounts[s.club] || 0) + 1; });
+  const topClubs = Object.entries(clubCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+
+  // Bad-result ranking
+  const resultCounts = {}; BAD_RESULTS.forEach(r => resultCounts[r] = 0);
+  shots.forEach(s => { if (s.result && resultCounts[s.result] !== undefined) resultCounts[s.result]++; });
+  const rankedResults = Object.entries(resultCounts).sort((a, b) => b[1] - a[1]);
+
+  let html = chartCard('Miss Direction', 'All logged misses', 'ac-miss-dir', 200);
+  if (topClubs.length) {
+    html += `<div class="section-title">Miss by Club</div>`;
+    topClubs.forEach((club, i) => {
+      html += chartCard(club, `${clubCounts[club]} shot${clubCounts[club] > 1 ? 's' : ''} logged`, 'ac-miss-club-' + i, 130);
+    });
+  }
+  html += chartCard('Most Common Bad Result', 'Trouble shots ranked by frequency', 'ac-bad-result', 200);
+  content.innerHTML = html;
+
+  // Miss direction — horizontal bar
+  makeChart('ac-miss-dir', {
+    type: 'bar',
+    data: { labels: MISS_CATS, datasets: [
+      { data: MISS_CATS.map(c => missCounts[c]), backgroundColor: AC['--amber'], borderRadius: 4, barThickness: 18 }
+    ] },
+    options: {
+      indexAxis: 'y',
+      scales: { x: { grid: { color: AC['--border'], drawBorder: false }, beginAtZero: true, ticks: { precision: 0 } },
+                y: { grid: { display: false } } }
+    }
+  });
+
+  // Per-club miss distribution
+  topClubs.forEach((club, i) => {
+    const counts = {}; MISS_CATS.forEach(c => counts[c] = 0);
+    shots.forEach(s => { if (s.club === club && s.miss && MISS_LABEL[s.miss]) counts[MISS_LABEL[s.miss]]++; });
+    makeChart('ac-miss-club-' + i, {
+      type: 'bar',
+      data: { labels: MISS_CATS, datasets: [
+        { data: MISS_CATS.map(c => counts[c]), backgroundColor: AC['--green'], borderRadius: 3, barThickness: 16 }
+      ] },
+      options: { scales: { x: { grid: { display: false } },
+                           y: { grid: { color: AC['--border'], drawBorder: false }, beginAtZero: true, ticks: { precision: 0, maxTicksLimit: 4 } } } }
+    });
+  });
+
+  // Bad result ranking — horizontal bar
+  makeChart('ac-bad-result', {
+    type: 'bar',
+    data: { labels: rankedResults.map(r => r[0]), datasets: [
+      { data: rankedResults.map(r => r[1]), backgroundColor: AC['--red'], borderRadius: 4, barThickness: 18 }
+    ] },
+    options: {
+      indexAxis: 'y',
+      scales: { x: { grid: { color: AC['--border'], drawBorder: false }, beginAtZero: true, ticks: { precision: 0 } },
+                y: { grid: { display: false } } }
+    }
+  });
+}
+
+// ── TAB 3: COURSES ──
+function renderCoursesTab(content, rounds) {
+  const courses = load(DB_KEY.courses);
+
+  // Group rounds by course
+  const byCourse = {};
+  rounds.forEach(r => { (byCourse[r.courseId] = byCourse[r.courseId] || []).push(r); });
+
+  const entries = Object.keys(byCourse).map(cid => {
+    const list = byCourse[cid];
+    const course = courses.find(c => c.id === cid);
+    const scores = list.map(r => r.totalScore);
+    const par = coursePar(list[0], courses);
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const best = Math.min(...scores);
+    const vsPar = avg - par;
+    return { cid, course, list, name: course ? course.name : 'Unknown Course',
+             played: list.length, avg, best, vsPar };
+  }).sort((a, b) => b.played - a.played);
+
+  if (!entries.length) { content.innerHTML = analyticsEmptyState(); return; }
+
+  content.innerHTML = entries.map(e => {
+    const vsParStr = e.vsPar === 0 ? 'E' : (e.vsPar > 0 ? '+' + e.vsPar.toFixed(1) : e.vsPar.toFixed(1));
+    return `<div class="course-stat-row">
+        <div class="course-stat-head" onclick="toggleCourseDetail('${e.cid}')">
+          <div>
+            <div class="course-stat-name">${e.name}</div>
+            <div class="course-stat-meta">${e.played} round${e.played > 1 ? 's' : ''} · vs par ${vsParStr}</div>
+          </div>
+          <div class="course-stat-figures">
+            <div class="course-stat-fig"><div class="course-stat-fig-val">${e.avg.toFixed(1)}</div><div class="course-stat-fig-lbl">Avg</div></div>
+            <div class="course-stat-fig"><div class="course-stat-fig-val">${e.best}</div><div class="course-stat-fig-lbl">Best</div></div>
+          </div>
+        </div>
+        <div class="course-stat-detail" id="course-detail-${e.cid}" style="display:none"></div>
+      </div>`;
+  }).join('');
+}
+
+function toggleCourseDetail(cid) {
+  const detail = document.getElementById('course-detail-' + cid);
+  if (!detail) return;
+  const open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : 'block';
+  if (open || detail.dataset.rendered) return;
+
+  const courses = load(DB_KEY.courses);
+  const list = sortedRounds(load(DB_KEY.rounds).filter(r => r.courseId === cid));
+  const avgPutts = (list.reduce((s, r) => s + (r.totalPutts || 0), 0) / list.length).toFixed(1);
+  const girPct = Math.round(list.reduce((s, r) => s + (r.girCount || 0), 0) / (list.length * 18) * 100);
+  const canvasId = 'ac-course-trend-' + cid;
+
+  detail.innerHTML = `
+    <div class="mini-stats">
+      <div class="mini-stat"><div class="mini-stat-val">${avgPutts}</div><div class="mini-stat-lbl">Avg Putts</div></div>
+      <div class="mini-stat"><div class="mini-stat-val">${girPct}%</div><div class="mini-stat-lbl">GIR</div></div>
+      <div class="mini-stat"><div class="mini-stat-val">${list.length}</div><div class="mini-stat-lbl">Rounds</div></div>
+    </div>
+    <div class="chart-card-sub">Scoring trend on this course</div>
+    <div class="chart-wrap" style="height:170px"><canvas id="${canvasId}"></canvas></div>`;
+  detail.dataset.rendered = '1';
+
+  makeChart(canvasId, {
+    type: 'line',
+    data: { labels: list.map(r => fmtShortDate(r.date)), datasets: [
+      { label: 'Score', data: list.map(r => r.totalScore), borderColor: AC['--green-bright'],
+        backgroundColor: AC['--green-dim'], pointRadius: 3, pointHoverRadius: 5, tension: 0.3, borderWidth: 2, fill: true }
+    ] },
+    options: { scales: baseScales() }
+  });
+}
+
+// ── TAB 4: HOLES ──
+function renderHolesTab(content, rounds) {
+  const courses = load(DB_KEY.courses);
+  const agg = Array.from({ length: 18 }, () => ({ strokes: 0, par: 0, putts: 0, n: 0 }));
+
+  rounds.forEach(r => {
+    const course = courses.find(c => c.id === r.courseId);
+    const pars = course ? course.holes.map(h => h.par) : [];
+    (r.holes || []).forEach((h, i) => {
+      if (i > 17 || !h || !h.strokes) return;
+      agg[i].strokes += h.strokes;
+      agg[i].par += pars[i] || 4;
+      agg[i].putts += h.putts || 0;
+      agg[i].n++;
+    });
+  });
+
+  const played = agg.map((a, i) => ({ i, ...a })).filter(a => a.n > 0);
+  if (!played.length) { content.innerHTML = analyticsEmptyState(); return; }
+
+  const labels = agg.map((_, i) => i + 1);
+  const avgScore = agg.map(a => a.n ? +(a.strokes / a.n).toFixed(2) : null);
+  const avgPar = agg.map(a => a.n ? +(a.par / a.n).toFixed(2) : null);
+  const avgPutts = agg.map(a => a.n ? +(a.putts / a.n).toFixed(2) : null);
+  const overPar = agg.map(a => a.n ? (a.strokes / a.n) - (a.par / a.n) : null);
+
+  // Hardest / easiest by avg strokes over par
+  const ranked = played.map(a => ({ hole: a.i + 1, over: (a.strokes / a.n) - (a.par / a.n) }))
+                       .sort((a, b) => b.over - a.over);
+  const hardest = ranked.slice(0, 3);
+  const easiest = ranked.slice(-3).reverse();
+  const hardSet = new Set(hardest.map(h => h.hole));
+  const easySet = new Set(easiest.map(h => h.hole));
+
+  const barColors = labels.map(h =>
+    hardSet.has(h) ? AC['--red'] : easySet.has(h) ? AC['--green-bright'] : AC['--green-dim']);
+
+  const fmtOver = o => o === 0 ? 'E' : (o > 0 ? '+' + o.toFixed(1) : o.toFixed(1));
+  const tags = hardest.map(h => `<span class="hole-tag hard">⬆ Hole ${h.hole} (${fmtOver(h.over)})</span>`).join('') +
+               easiest.map(h => `<span class="hole-tag easy">⬇ Hole ${h.hole} (${fmtOver(h.over)})</span>`).join('');
+
+  content.innerHTML =
+    `<div class="section-title" style="margin-top:0">Hardest & Easiest</div>
+     <div class="hole-tags">${tags}</div>` +
+    chartCard('Scoring Average per Hole', 'Average strokes (bars) vs par (line)', 'ac-hole-score', 230) +
+    chartCard('Average Putts per Hole', 'Holes 1–18', 'ac-hole-putts', 200);
+
+  makeChart('ac-hole-score', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { type: 'bar', label: 'Avg strokes', data: avgScore, backgroundColor: barColors, borderRadius: 3, order: 2 },
+      { type: 'line', label: 'Par', data: avgPar, borderColor: AC['--text-dim'], backgroundColor: AC['--text-dim'],
+        pointRadius: 0, borderWidth: 1.5, stepped: true, order: 1 }
+    ] },
+    options: {
+      scales: { x: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 9 } } },
+                y: { grid: { color: AC['--border'], drawBorder: false }, beginAtZero: false } },
+      plugins: { legend: { display: true, position: 'top' } }
+    }
+  });
+
+  makeChart('ac-hole-putts', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { data: avgPutts, backgroundColor: AC['--green'], borderRadius: 3 }
+    ] },
+    options: {
+      scales: { x: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 9 } } },
+                y: { grid: { color: AC['--border'], drawBorder: false }, beginAtZero: true } }
+    }
+  });
+}
+
+// ════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════
 
@@ -2199,6 +2751,7 @@ function showToast(msg) {
 // INIT
 // ════════════════════════════════════════════
 
+setupChartDefaults();
 renderHome();
 setActiveTab('home');
 
