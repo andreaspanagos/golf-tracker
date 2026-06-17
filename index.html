@@ -448,6 +448,75 @@
 
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
+  /* ── TEE ROW ── */
+  .tee-row {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .tee-row-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .tee-row-name {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+  }
+  .tee-row-name:focus { border-color: var(--green-dim); }
+  .tee-default-btn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tee-default-btn.active { background: var(--green-dim); color: var(--green-bright); border-color: var(--green); }
+  .tee-delete-btn {
+    font-size: 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+  .tee-delete-btn:active { color: var(--red); }
+  .tee-dists-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 3px;
+  }
+  .par-input-sm {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 2px;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    text-align: center;
+    -webkit-appearance: none;
+  }
+  .par-input-sm:focus { border-color: var(--green-dim); }
+  .hole-num-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 2px;
+  }
+
   /* ── TOAST ── */
   .toast {
     position: fixed;
@@ -466,6 +535,100 @@
     white-space: nowrap;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── TAB BAR ── */
+  .tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    height: calc(56px + var(--safe-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 8px;
+    z-index: 50;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 4px 0;
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+  .tab-item.active { color: var(--green-bright); }
+  .tab-item:active { opacity: 0.7; }
+  .tab-icon { font-size: 22px; line-height: 1; }
+  .tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  /* screens with tab bar need bottom padding */
+  .has-tabs .bottom-actions {
+    padding-bottom: calc(16px + 56px + var(--safe-bottom));
+  }
+  .has-tabs .screen-body {
+    padding-bottom: calc(20px + 56px + var(--safe-bottom));
+  }
+
+  /* ── PROFILE SCREEN ── */
+  .profile-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .profile-avatar {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: var(--green-dim);
+    border: 2px solid var(--green);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    margin: 0 auto 12px;
+  }
+  .profile-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  .profile-hcp-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .profile-hcp-val {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    color: var(--green-bright);
+  }
+  .profile-hcp-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .hcp-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+  }
+  .hcp-history-val { font-size: 17px; font-weight: 700; color: var(--green-bright); }
+  .hcp-history-date { font-size: 12px; color: var(--text-dim); }
+  .hcp-history-note { font-size: 12px; color: var(--text-muted); font-style: italic; }
 
   /* ── COURSE LIST ITEM ── */
   .course-item {
@@ -510,7 +673,7 @@
 <!-- ══════════════════════════════════════════
      SCREEN: HOME
 ══════════════════════════════════════════ -->
-<div id="screen-home" class="screen active">
+<div id="screen-home" class="screen has-tabs active">
   <div class="header">
     <div>
       <div class="header-title">⛳ Golf Tracker</div>
@@ -527,6 +690,45 @@
   </div>
   <div class="bottom-actions">
     <button class="btn btn-primary" onclick="showScreen('screen-round-setup')">Start Round</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: PLAYER PROFILE
+══════════════════════════════════════════ -->
+<div id="screen-profile" class="screen has-tabs">
+  <div class="header">
+    <div class="header-title">Player Profile</div>
+    <div class="btn-icon" onclick="openEditProfile()">✏️</div>
+  </div>
+  <div class="screen-body">
+    <div id="profile-hero-section"></div>
+
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Handicap History</span>
+      <button onclick="openAddHcp()" style="background:var(--green-dim);color:var(--green-bright);border:1px solid var(--green);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer">+ Log HCP</button>
+    </div>
+    <div id="hcp-history-list"></div>
+
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;margin-top:20px">
+      <span>My Bag</span>
+      <button onclick="openAddClub()" style="background:var(--green-dim);color:var(--green-bright);border:1px solid var(--green);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer">+ Add Club</button>
+    </div>
+    <div id="profile-clubs-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB BAR
+══════════════════════════════════════════ -->
+<div class="tab-bar" id="main-tab-bar">
+  <div class="tab-item active" id="tab-home" onclick="switchTab('home')">
+    <div class="tab-icon">🏠</div>
+    <div class="tab-label">Rounds</div>
+  </div>
+  <div class="tab-item" id="tab-profile" onclick="switchTab('profile')">
+    <div class="tab-icon">👤</div>
+    <div class="tab-label">Profile</div>
   </div>
 </div>
 
@@ -562,13 +764,7 @@
     </div>
     <div class="form-group" id="tee-group" style="display:none">
       <label class="form-label">Tee</label>
-      <select id="round-tee" class="form-input">
-        <option value="yellow">Yellow</option>
-        <option value="white">White</option>
-        <option value="blue">Blue</option>
-        <option value="red">Red</option>
-        <option value="gold">Gold</option>
-      </select>
+      <select id="round-tee" class="form-input"></select>
     </div>
     <div class="form-group">
       <label class="form-label">Date</label>
@@ -709,21 +905,7 @@
     <div style="width:36px"></div>
   </div>
   <div class="screen-body">
-    <div class="section-title">My Bag</div>
-    <div id="clubs-list"></div>
-    <button class="btn btn-secondary" onclick="openAddClub()" style="margin-top:8px;font-size:14px;padding:12px">+ Add Club</button>
-    <div class="section-title" style="margin-top:24px">Player</div>
-    <div class="form-group">
-      <label class="form-label">Name</label>
-      <input id="settings-name" type="text" class="form-input" placeholder="Your name">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Current Handicap Index</label>
-      <input id="settings-hcp" type="number" step="0.1" class="form-input" placeholder="e.g. 12.4">
-    </div>
-    <button class="btn btn-secondary" onclick="saveSettings()" style="margin-top:4px">Save</button>
-
-    <div class="section-title" style="margin-top:24px">Data</div>
+    <div class="section-title">Data</div>
     <button class="btn btn-danger" onclick="confirmClearData()">Clear All Data</button>
   </div>
 </div>
@@ -739,17 +921,16 @@
       <label class="form-label">Course Name</label>
       <input id="course-name-input" type="text" class="form-input" placeholder="e.g. Ullna Golf">
     </div>
-    <div class="form-group">
-      <label class="form-label">Default Tee</label>
-      <div class="toggle-grid toggle-grid-4" id="course-tee-grid">
-        <button class="toggle-btn selected" data-group="course-tee" data-val="yellow" onclick="selectToggle(this)">🟡 Yellow</button>
-        <button class="toggle-btn" data-group="course-tee" data-val="white" onclick="selectToggle(this)">⚪ White</button>
-        <button class="toggle-btn" data-group="course-tee" data-val="blue" onclick="selectToggle(this)">🔵 Blue</button>
-        <button class="toggle-btn" data-group="course-tee" data-val="red" onclick="selectToggle(this)">🔴 Red</button>
-      </div>
+
+    <div class="section-title">Pars (set once)</div>
+    <div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-bottom:16px" id="pars-grid"></div>
+
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Tees</span>
+      <button onclick="addTeeRow()" style="background:var(--green-dim);color:var(--green-bright);border:1px solid var(--green);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer">+ Add Tee</button>
     </div>
-    <div class="section-title">Holes (Par · Distance m)</div>
-    <div id="holes-setup-grid"></div>
+    <div id="tees-setup-container"></div>
+
     <div style="margin-top:16px">
       <button class="btn btn-primary" onclick="saveCourse()">Save Course</button>
     </div>
@@ -757,8 +938,48 @@
 </div>
 
 <!-- ══════════════════════════════════════════
-     MODAL: ADD SHOT
+     MODAL: EDIT PROFILE
 ══════════════════════════════════════════ -->
+<div id="modal-profile" class="modal-overlay" onclick="closeModalOnBg(event,'modal-profile')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Edit Profile</div>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input id="profile-name-input" type="text" class="form-input" placeholder="Your name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Current Handicap Index</label>
+      <input id="profile-hcp-input" type="number" step="0.1" class="form-input" placeholder="e.g. 12.4">
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()">Save</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: LOG HCP
+══════════════════════════════════════════ -->
+<div id="modal-hcp" class="modal-overlay" onclick="closeModalOnBg(event,'modal-hcp')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Log Handicap</div>
+    <div class="form-group">
+      <label class="form-label">Handicap Index</label>
+      <input id="hcp-val-input" type="number" step="0.1" class="form-input" placeholder="e.g. 11.8">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input id="hcp-date-input" type="date" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note (optional)</label>
+      <input id="hcp-note-input" type="text" class="form-input" placeholder="e.g. After Ullna round">
+    </div>
+    <button class="btn btn-primary" onclick="saveHcpEntry()">Save</button>
+  </div>
+</div>
+
+
 <div id="modal-shot" class="modal-overlay" onclick="closeModalOnBg(event,'modal-shot')">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -823,6 +1044,7 @@ const DB_KEY = {
   courses: 'gt_courses',
   rounds: 'gt_rounds',
   settings: 'gt_settings',
+  hcpHistory: 'gt_hcp_history',
 };
 
 function load(key) {
@@ -859,10 +1081,27 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0, 0);
-  if (id === 'screen-home') renderHome();
+
+  // Show/hide tab bar — only on tabbed screens
+  const tabbedScreens = ['screen-home', 'screen-profile'];
+  document.getElementById('main-tab-bar').style.display =
+    tabbedScreens.includes(id) ? 'flex' : 'none';
+
+  if (id === 'screen-home') { renderHome(); setActiveTab('home'); }
+  if (id === 'screen-profile') { renderProfile(); setActiveTab('profile'); }
   if (id === 'screen-courses') renderCourses();
-  if (id === 'screen-settings') renderSettings();
+  if (id === 'screen-settings') {}
   if (id === 'screen-round-setup') renderRoundSetup();
+}
+
+function switchTab(tab) {
+  if (tab === 'home') showScreen('screen-home');
+  if (tab === 'profile') showScreen('screen-profile');
+}
+
+function setActiveTab(tab) {
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`)?.classList.add('active');
 }
 
 // ════════════════════════════════════════════
@@ -975,7 +1214,7 @@ function renderCourses() {
       <div class="course-item">
         <div onclick="openEditCourse('${c.id}')" style="flex:1">
           <div class="course-item-name">${c.name}</div>
-          <div class="course-item-meta">Par ${par} · ${dist}m · ${c.defaultTee || 'yellow'} tee</div>
+          <div class="course-item-meta">Par ${par} · ${c.tees && c.tees.length ? c.tees.length + ' tee' + (c.tees.length > 1 ? 's' : '') + ' · ' + c.tees.map(t=>t.name).join(', ') : (c.defaultTee || '—')}</div>
         </div>
         <div class="course-item-actions">
           <span class="icon-btn" onclick="editCourse('${c.id}')">✏️</span>
@@ -1000,11 +1239,12 @@ function deleteCourse(id) {
 // ADD / EDIT COURSE MODAL
 // ════════════════════════════════════════════
 
+let teesData = []; // working copy while modal is open
+
 function openAddCourse(id = null) {
   editingCourseId = id;
   const modal = document.getElementById('modal-course');
   const title = document.getElementById('modal-course-title');
-  const grid = document.getElementById('holes-setup-grid');
   const nameInput = document.getElementById('course-name-input');
 
   let existingCourse = null;
@@ -1016,51 +1256,118 @@ function openAddCourse(id = null) {
   title.textContent = id ? 'Edit Course' : 'Add Course';
   nameInput.value = existingCourse ? existingCourse.name : '';
 
-  // Set default tee selection
-  const defaultTee = existingCourse ? (existingCourse.defaultTee || 'yellow') : 'yellow';
-  document.querySelectorAll('[data-group="course-tee"]').forEach(b => {
-    b.classList.toggle('selected', b.dataset.val === defaultTee);
-  });
+  // Build pars grid (9+9 layout with hole labels)
+  const pars = existingCourse ? existingCourse.holes.map(h => h.par) : Array(18).fill(4);
+  renderParsGrid(pars);
 
-  grid.innerHTML = Array.from({length: 18}, (_, i) => {
-    const h = existingCourse ? existingCourse.holes[i] : null;
-    return `
-      <div class="hole-setup-row">
-        <div class="hole-setup-num">${i + 1}</div>
-        <input class="form-input-sm" type="number" id="h-par-${i}" placeholder="Par" min="3" max="5" value="${h ? h.par : ''}">
-        <input class="form-input-sm" type="number" id="h-dist-${i}" placeholder="Dist (m)" value="${h ? (h.dist || '') : ''}">
-      </div>`;
-  }).join('');
+  // Build tees
+  teesData = existingCourse && existingCourse.tees
+    ? JSON.parse(JSON.stringify(existingCourse.tees))
+    : [{ name: existingCourse ? (existingCourse.defaultTee || '') : '', dists: Array(18).fill(''), isDefault: true }];
 
+  // Migrate old single-dist format
+  if (existingCourse && !existingCourse.tees) {
+    teesData[0].dists = existingCourse.holes.map(h => h.dist || '');
+  }
+
+  renderTeesContainer();
   modal.classList.add('active');
+}
+
+function renderParsGrid(pars) {
+  const el = document.getElementById('pars-grid');
+  // Two rows: holes 1-9 top, 10-18 bottom, with row labels
+  let html = '';
+  // Labels row 1-9
+  for (let i = 0; i < 9; i++) html += `<div class="hole-num-label">${i+1}</div>`;
+  // Par inputs 1-9
+  for (let i = 0; i < 9; i++) html += `<input class="par-input-sm" type="number" id="par-${i}" min="3" max="5" value="${pars[i]||4}" placeholder="4">`;
+  // Labels row 10-18
+  for (let i = 9; i < 18; i++) html += `<div class="hole-num-label">${i+1}</div>`;
+  // Par inputs 10-18
+  for (let i = 9; i < 18; i++) html += `<input class="par-input-sm" type="number" id="par-${i}" min="3" max="5" value="${pars[i]||4}" placeholder="4">`;
+  el.innerHTML = html;
+}
+
+function renderTeesContainer() {
+  const el = document.getElementById('tees-setup-container');
+  el.innerHTML = teesData.map((tee, ti) => `
+    <div class="tee-row" id="tee-row-${ti}">
+      <div class="tee-row-header">
+        <input class="tee-row-name" type="text" placeholder="Tee name (e.g. Yellow, 54…)"
+          value="${tee.name}" oninput="teesData[${ti}].name=this.value">
+        <button class="tee-default-btn ${tee.isDefault ? 'active' : ''}" onclick="setDefaultTee(${ti})">
+          ${tee.isDefault ? '★ Default' : 'Set default'}
+        </button>
+        ${teesData.length > 1 ? `<span class="tee-delete-btn" onclick="deleteTeeRow(${ti})">✕</span>` : ''}
+      </div>
+      <div style="margin-bottom:4px">
+        <div class="tee-dists-grid">
+          ${Array.from({length:9}, (_,i) => `
+            <div class="hole-num-label">${i+1}</div>`).join('')}
+          ${Array.from({length:9}, (_,i) => `
+            <input class="par-input-sm" type="number" placeholder="m"
+              value="${tee.dists[i]||''}"
+              oninput="teesData[${ti}].dists[${i}]=this.value">`).join('')}
+          ${Array.from({length:9}, (_,i) => `
+            <div class="hole-num-label">${i+10}</div>`).join('')}
+          ${Array.from({length:9}, (_,i) => `
+            <input class="par-input-sm" type="number" placeholder="m"
+              value="${tee.dists[i+9]||''}"
+              oninput="teesData[${ti}].dists[${i+9}]=this.value">`).join('')}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addTeeRow() {
+  teesData.push({ name: '', dists: Array(18).fill(''), isDefault: false });
+  renderTeesContainer();
+}
+
+function deleteTeeRow(ti) {
+  const wasDefault = teesData[ti].isDefault;
+  teesData.splice(ti, 1);
+  if (wasDefault && teesData.length > 0) teesData[0].isDefault = true;
+  renderTeesContainer();
+}
+
+function setDefaultTee(ti) {
+  teesData.forEach((t, i) => t.isDefault = i === ti);
+  renderTeesContainer();
 }
 
 function saveCourse() {
   const name = document.getElementById('course-name-input').value.trim();
   if (!name) { alert('Enter a course name.'); return; }
 
-  const defaultTee = document.querySelector('.toggle-btn.selected[data-group="course-tee"]')?.dataset.val || 'yellow';
+  // Read pars
+  const holes = Array.from({length: 18}, (_, i) => ({
+    par: parseInt(document.getElementById(`par-${i}`)?.value) || 4
+  }));
 
-  const holes = [];
-  for (let i = 0; i < 18; i++) {
-    const par = parseInt(document.getElementById(`h-par-${i}`).value) || 4;
-    const dist = parseInt(document.getElementById(`h-dist-${i}`).value) || 0;
-    holes.push({ par, dist });
-  }
+  // Read tees from teesData (already updated via oninput)
+  const tees = teesData.map(t => ({
+    name: t.name.trim() || 'Unnamed',
+    dists: t.dists.map(d => parseInt(d) || 0),
+    isDefault: t.isDefault
+  }));
+
+  const defaultTee = (tees.find(t => t.isDefault) || tees[0])?.name || '';
 
   let courses = load(DB_KEY.courses);
   if (editingCourseId) {
-    courses = courses.map(c => c.id === editingCourseId ? { ...c, name, defaultTee, holes } : c);
+    courses = courses.map(c => c.id === editingCourseId ? { ...c, name, holes, tees, defaultTee } : c);
     showToast('Course updated');
   } else {
-    courses.push({ id: 'c_' + Date.now(), name, defaultTee, holes });
+    courses.push({ id: 'c_' + Date.now(), name, holes, tees, defaultTee });
     showToast('Course added');
   }
   save(DB_KEY.courses, courses);
 
   document.getElementById('modal-course').classList.remove('active');
   renderCourses();
-  renderRoundSetup(); // refresh dropdown
+  renderRoundSetup();
 }
 
 // ════════════════════════════════════════════
@@ -1083,12 +1390,20 @@ function renderRoundSetup() {
 
 function onCourseChange() {
   const val = document.getElementById('round-course').value;
-  document.getElementById('tee-group').style.display = val ? 'block' : 'none';
+  const teeGroup = document.getElementById('tee-group');
+  const teeSelect = document.getElementById('round-tee');
+  teeGroup.style.display = val ? 'block' : 'none';
   if (val) {
     const courses = load(DB_KEY.courses);
     const course = courses.find(c => c.id === val);
-    if (course && course.defaultTee) {
-      document.getElementById('round-tee').value = course.defaultTee;
+    if (course) {
+      // Build tee options from tees array, fallback to defaultTee string for old data
+      const tees = course.tees && course.tees.length
+        ? course.tees
+        : [{ name: course.defaultTee || 'Default', isDefault: true }];
+      teeSelect.innerHTML = tees.map(t =>
+        `<option value="${t.name}" ${t.isDefault ? 'selected' : ''}>${t.name}</option>`
+      ).join('');
     }
   }
 }
@@ -1142,7 +1457,16 @@ function loadHole(idx) {
   document.getElementById('hole-course-name').textContent = course.name;
   document.getElementById('hole-num-display').textContent = idx + 1;
   document.getElementById('hole-par-display').textContent = holeData.par;
-  document.getElementById('hole-dist-display').textContent = holeData.dist ? `${holeData.dist}m` : '—';
+
+  // Resolve distance from selected tee
+  let dist = 0;
+  if (course.tees && course.tees.length) {
+    const activeTee = course.tees.find(t => t.name === activeRound.tee) || course.tees[0];
+    dist = activeTee.dists ? (activeTee.dists[idx] || 0) : 0;
+  } else {
+    dist = holeData.dist || 0; // legacy fallback
+  }
+  document.getElementById('hole-dist-display').textContent = dist ? `${dist}m` : '—';
 
   // Running score
   const totalStrokes = activeRound.holes.slice(0, idx).reduce((s, h) => s + h.strokes, 0);
@@ -1371,7 +1695,16 @@ function showSummary() {
 
 function renderSummaryContent(round, course) {
   const holes = round.holes || [];
-  const courseHoles = course ? course.holes : holes.map(() => ({ par: 4, dist: 0 }));
+  const courseHoles = course ? course.holes : holes.map(() => ({ par: 4 }));
+
+  // Resolve distances for the tee played
+  let teeDists = Array(18).fill(0);
+  if (course && course.tees && course.tees.length) {
+    const activeTee = course.tees.find(t => t.name === round.tee) || course.tees[0];
+    teeDists = activeTee.dists || Array(18).fill(0);
+  } else if (course) {
+    teeDists = course.holes.map(h => h.dist || 0); // legacy
+  }
   const totalScore = round.totalScore || holes.reduce((s, h) => s + h.strokes, 0);
   const totalPutts = round.totalPutts || holes.reduce((s, h) => s + h.putts, 0);
   const coursePar = courseHoles.reduce((s, h) => s + h.par, 0);
@@ -1403,7 +1736,7 @@ function renderSummaryContent(round, course) {
       <tr>
         <td>${startIdx + i + 1}</td>
         <td>${parArr[i].par}</td>
-        <td>${parArr[i].dist || '—'}</td>
+        <td>${teeDists[startIdx + i] || '—'}</td>
         <td class="sc-score ${scoreClass(h.strokes, parArr[i].par)}">${h.strokes || '—'}</td>
         <td>${h.putts || '—'}</td>
         <td style="font-size:11px">${h.gir === true ? '✓' : h.gir === false ? '✗' : '—'}</td>
@@ -1473,24 +1806,142 @@ function finishRound() {
 }
 
 // ════════════════════════════════════════════
-// SETTINGS
+// PLAYER PROFILE
 // ════════════════════════════════════════════
 
-function renderSettings() {
+function renderProfile() {
   const settings = getSettings();
-  document.getElementById('settings-name').value = settings.name || '';
-  document.getElementById('settings-hcp').value = settings.handicap || '';
-  renderClubList();
+  const hcpHistory = load(DB_KEY.hcpHistory);
+
+  // Hero section
+  const initials = settings.name
+    ? settings.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    : '?';
+  document.getElementById('profile-hero-section').innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-avatar">${initials}</div>
+      <div class="profile-name">${settings.name || 'Add your name'}</div>
+      <div class="profile-hcp-row">
+        <div>
+          <div class="profile-hcp-val">${settings.handicap || '—'}</div>
+          <div class="profile-hcp-label">Handicap Index</div>
+        </div>
+      </div>
+    </div>`;
+
+  // HCP history
+  const hcpEl = document.getElementById('hcp-history-list');
+  if (hcpHistory.length === 0) {
+    hcpEl.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No entries yet. Tap + Log HCP to start tracking.</div>`;
+  } else {
+    const sorted = [...hcpHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+    hcpEl.innerHTML = sorted.map((entry, i) => {
+      const prev = sorted[i + 1];
+      const delta = prev ? (parseFloat(entry.val) - parseFloat(prev.val)).toFixed(1) : null;
+      const deltaStr = delta !== null
+        ? (delta > 0 ? `<span style="color:var(--bogey)">▲ ${delta}</span>`
+           : delta < 0 ? `<span style="color:var(--birdie)">▼ ${Math.abs(delta)}</span>`
+           : `<span style="color:var(--text-muted)">— same</span>`)
+        : '';
+      const d = new Date(entry.date);
+      const dateStr = d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' });
+      return `
+        <div class="hcp-history-item">
+          <div>
+            <div class="hcp-history-val">${entry.val}</div>
+            <div class="hcp-history-date">${dateStr}${entry.note ? ' · ' + entry.note : ''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:13px">${deltaStr}</div>
+            <span class="icon-btn" onclick="deleteHcpEntry(${hcpHistory.indexOf(entry)})">✕</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Clubs
+  renderProfileClubList();
 }
 
-function renderClubList() {
+function openEditProfile() {
   const settings = getSettings();
-  const el = document.getElementById('clubs-list');
+  document.getElementById('profile-name-input').value = settings.name || '';
+  document.getElementById('profile-hcp-input').value = settings.handicap || '';
+  document.getElementById('modal-profile').classList.add('active');
+}
+
+function saveProfile() {
+  const settings = getSettings();
+  settings.name = document.getElementById('profile-name-input').value.trim();
+  settings.handicap = document.getElementById('profile-hcp-input').value;
+  save(DB_KEY.settings, settings);
+  document.getElementById('modal-profile').classList.remove('active');
+  renderProfile();
+  showToast('Profile saved');
+}
+
+function openAddHcp() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('hcp-val-input').value = '';
+  document.getElementById('hcp-date-input').value = today;
+  document.getElementById('hcp-note-input').value = '';
+  document.getElementById('modal-hcp').classList.add('active');
+}
+
+function saveHcpEntry() {
+  const val = document.getElementById('hcp-val-input').value.trim();
+  if (!val) { showToast('Enter a handicap value'); return; }
+  const date = document.getElementById('hcp-date-input').value;
+  const note = document.getElementById('hcp-note-input').value.trim();
+
+  const history = load(DB_KEY.hcpHistory);
+  history.push({ val: parseFloat(val), date, note });
+  save(DB_KEY.hcpHistory, history);
+
+  // Also update current HCP in settings
+  const settings = getSettings();
+  settings.handicap = val;
+  save(DB_KEY.settings, settings);
+
+  document.getElementById('modal-hcp').classList.remove('active');
+  renderProfile();
+  showToast('HCP logged');
+}
+
+function deleteHcpEntry(idx) {
+  const history = load(DB_KEY.hcpHistory);
+  history.splice(idx, 1);
+  save(DB_KEY.hcpHistory, history);
+  renderProfile();
+  showToast('Entry removed');
+}
+
+function renderProfileClubList() {
+  const settings = getSettings();
+  const el = document.getElementById('profile-clubs-list');
+  if (!el) return;
   el.innerHTML = settings.clubs.map((c, i) => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
       <span style="font-size:15px">${c}</span>
-      <span class="icon-btn" onclick="deleteClub(${i})">✕</span>
+      <span class="icon-btn" onclick="deleteClubFromProfile(${i})">✕</span>
     </div>`).join('');
+}
+
+function deleteClubFromProfile(idx) {
+  const settings = getSettings();
+  settings.clubs.splice(idx, 1);
+  save(DB_KEY.settings, settings);
+  renderProfileClubList();
+}
+
+// ════════════════════════════════════════════
+// SETTINGS (data only)
+// ════════════════════════════════════════════
+
+function renderSettings() {} // kept for compatibility
+
+function renderClubList() {
+  renderProfileClubList();
 }
 
 function deleteClub(idx) {
@@ -1512,16 +1963,8 @@ function saveNewClub() {
   settings.clubs.push(name);
   save(DB_KEY.settings, settings);
   document.getElementById('modal-club').classList.remove('active');
-  renderClubList();
+  renderProfileClubList();
   showToast('Club added');
-}
-
-function saveSettings() {
-  const settings = getSettings();
-  settings.name = document.getElementById('settings-name').value.trim();
-  settings.handicap = document.getElementById('settings-hcp').value;
-  save(DB_KEY.settings, settings);
-  showToast('Saved');
 }
 
 function confirmClearData() {
@@ -1561,6 +2004,7 @@ function showToast(msg) {
 // ════════════════════════════════════════════
 
 renderHome();
+setActiveTab('home');
 </script>
 </body>
 </html>
