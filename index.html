@@ -1081,20 +1081,30 @@
 </div>
 
 <!-- ══════════════════════════════════════════
-     MODAL: IMPORT COURSE FROM SCORECARD
+     MODAL: IMPORT COURSES FROM JSON FILES
 ══════════════════════════════════════════ -->
 <div id="modal-import-course" class="modal-overlay" onclick="closeModalOnBg(event,'modal-import-course')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Import from Scorecard</div>
-    <div class="form-group">
-      <label class="form-label">Scorecard</label>
-      <textarea id="import-scorecard-text" class="form-input" rows="8"
-        style="resize:vertical;line-height:1.4;font-family:inherit"
-        placeholder="Paste scorecard data here — any format works.&#10;e.g. copy from mingolf.se, type hole-by-hole,&#10;or describe the course in plain text."></textarea>
+    <div class="modal-title">Import Courses</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.5;margin-bottom:16px">
+      Upload the course JSON file(s) Claude generated for you. You can select several at once.
     </div>
-    <div id="import-error" style="display:none;background:#2a1414;color:var(--red);border:1px solid #3a2020;border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;line-height:1.4;margin-bottom:14px"></div>
-    <button class="btn btn-primary" id="import-parse-btn" onclick="parseScorecard()">Parse Scorecard →</button>
+
+    <label class="btn btn-secondary" style="display:block;text-align:center;cursor:pointer">
+      📋 Choose JSON file(s)
+      <input id="import-file-input" type="file" accept=".json,application/json" multiple
+        style="display:none" onchange="onImportFilesPicked(this.files)">
+    </label>
+
+    <div id="import-error" style="display:none;background:#2a1414;color:var(--red);border:1px solid #3a2020;border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;line-height:1.4;margin-top:14px"></div>
+
+    <div id="import-results" style="margin-top:16px"></div>
+
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" id="import-save-btn" onclick="saveImportedCourses()" disabled
+        style="opacity:0.5">Save Courses</button>
+    </div>
   </div>
 </div>
 
@@ -1676,10 +1686,20 @@ function saveCourse() {
   const name = document.getElementById('course-name-input').value.trim();
   if (!name) { alert('Enter a course name.'); return; }
 
-  // Read pars
-  const holes = Array.from({length: 18}, (_, i) => ({
-    par: parseInt(document.getElementById(`par-${i}`)?.value) || 4
-  }));
+  // Preserve any per-hole stroke index (hcp) from an imported course — the manual
+  // editor has no hcp inputs, so without this an edit would silently drop it.
+  let existingHoles = [];
+  if (editingCourseId) {
+    const existing = load(DB_KEY.courses).find(c => c.id === editingCourseId);
+    existingHoles = (existing && existing.holes) || [];
+  }
+
+  // Read pars (carrying over existing hcp where present)
+  const holes = Array.from({length: 18}, (_, i) => {
+    const hole = { par: parseInt(document.getElementById(`par-${i}`)?.value) || 4 };
+    if (existingHoles[i] && existingHoles[i].hcp != null) hole.hcp = existingHoles[i].hcp;
+    return hole;
+  });
 
   // Read tees from teesData (already updated via oninput)
   const tees = teesData.map(t => ({
@@ -1706,41 +1726,29 @@ function saveCourse() {
 }
 
 // ════════════════════════════════════════════
-// IMPORT COURSE FROM SCORECARD (Claude-powered)
+// IMPORT COURSES FROM JSON FILES
 // ════════════════════════════════════════════
+//
+// Workflow: Claude (in chat) researches a course from a link and produces a JSON
+// file per course. The user uploads one or more of those files here; each is
+// validated and saved as a course. No network call — purely client-side.
+//
+// Expected JSON (one course per file, or an array of these):
+// {
+//   "name": "Ullna Golf Club",
+//   "holes": [ { "hole": 1, "par": 4, "hcp": 5 }, ... 18 items ],
+//   "tees":  [ { "name": "Yellow", "isDefault": true, "dists": [365,145,...18] }, ... ]
+// }
 
-const IMPORT_SYSTEM_PROMPT = `You are a golf scorecard parser. Extract course data from the user's input and return ONLY a valid JSON object with no other text, markdown, or explanation.
-
-The JSON must follow this exact structure:
-{
-  "name": "Course Name",
-  "holes": [
-    { "par": 4 },
-    ... 18 items total
-  ],
-  "tees": [
-    {
-      "name": "Yellow",
-      "dists": [365, 145, 520, ...],
-      "isDefault": true
-    }
-  ]
-}
-
-Rules:
-- holes array must always have exactly 18 items
-- Each hole has only a par (3, 4, or 5)
-- tees array has one entry per tee colour/name found in the input
-- dists array must have exactly 18 numbers (use 0 for any missing distances)
-- isDefault: true for the first/main tee only
-- If course name is not found, use empty string
-- If no distances found, return one tee with name 'Default' and all zeros
-- Return ONLY the JSON object, nothing else`;
+let stagedCourses = []; // [{ ok, course?, error?, label }] from the last file selection
 
 function openImportCourse() {
-  document.getElementById('import-scorecard-text').value = '';
+  stagedCourses = [];
+  const input = document.getElementById('import-file-input');
+  if (input) input.value = '';
+  document.getElementById('import-results').innerHTML = '';
   hideImportError();
-  setImportLoading(false);
+  updateImportSaveBtn();
   document.getElementById('modal-import-course').classList.add('active');
 }
 
@@ -1756,24 +1764,7 @@ function showImportError(msg) {
   el.style.display = 'block';
 }
 
-function setImportLoading(loading) {
-  const btn = document.getElementById('import-parse-btn');
-  btn.disabled = loading;
-  btn.textContent = loading ? 'Reading…' : 'Parse Scorecard →';
-  btn.style.opacity = loading ? '0.6' : '';
-}
-
-// Pull a JSON object out of the model reply, tolerating stray fences/text.
-function extractImportJson(text) {
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) return fence[1].trim();
-  const first = text.indexOf('{');
-  const last = text.lastIndexOf('}');
-  if (first !== -1 && last !== -1 && last > first) return text.slice(first, last + 1);
-  return text.trim();
-}
-
-// Coerce a tee's distances into exactly 18 finite numbers.
+// Coerce a tee's distances into exactly 18 finite numbers (0 for missing/bad).
 function normalizeImportDists(dists) {
   const out = Array(18).fill(0);
   if (Array.isArray(dists)) {
@@ -1785,89 +1776,128 @@ function normalizeImportDists(dists) {
   return out;
 }
 
-const GENERIC_IMPORT_ERROR = "Couldn't read that scorecard. Try rephrasing or enter manually.";
+// Turn a raw parsed object into a normalized app course, or report why it's invalid.
+// Returns { ok, course?, error?, label }.
+function validateImportedCourse(obj) {
+  const label = (obj && obj.name != null && String(obj.name).trim()) || 'Unnamed course';
 
-async function parseScorecard() {
-  const text = document.getElementById('import-scorecard-text').value.trim();
-  if (!text) { showImportError('Paste some scorecard text first.'); return; }
-  hideImportError();
-  setImportLoading(true);
-
-  // Shortcut: if input is already valid JSON, skip the API call entirely.
-  try {
-    const direct = JSON.parse(extractImportJson(text));
-    if (direct && Array.isArray(direct.holes) && direct.holes.length === 18) {
-      applyParsedCourse(direct);
-      setImportLoading(false);
-      document.getElementById('modal-import-course').classList.remove('active');
-      showToast('Scorecard imported — review and save');
-      return;
-    }
-  } catch (e) { /* not JSON — fall through to Claude */ }
-
-  let parsed;
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: IMPORT_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: text }],
-      }),
-    });
-    if (!res.ok) throw new Error('API error ' + res.status);
-    const data = await res.json();
-    const reply = (data && data.content && data.content[0] && data.content[0].text) || '';
-    parsed = JSON.parse(extractImportJson(reply));
-  } catch (e) {
-    setImportLoading(false);
-    showImportError(GENERIC_IMPORT_ERROR);
-    return;
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    return { ok: false, error: 'Not a course object', label };
+  }
+  if (!Array.isArray(obj.holes) || obj.holes.length !== 18) {
+    const n = Array.isArray(obj.holes) ? obj.holes.length : 0;
+    return { ok: false, error: `Has ${n} holes — expected 18`, label };
   }
 
-  // Validate hole count before touching the form.
-  const holeCount = parsed && Array.isArray(parsed.holes) ? parsed.holes.length : 0;
-  if (holeCount !== 18) {
-    setImportLoading(false);
-    showImportError(`Parsed ${holeCount} holes — expected 18. Try adding more detail.`);
-    return;
-  }
+  // Holes: par clamped to 3/4/5 (default 4); hcp 1–18 kept, else null.
+  const holes = obj.holes.map(h => {
+    const par = h && (h.par === 3 || h.par === 4 || h.par === 5) ? h.par : 4;
+    const hcpNum = h ? parseInt(h.hcp, 10) : NaN;
+    const hcp = Number.isFinite(hcpNum) && hcpNum >= 1 && hcpNum <= 18 ? hcpNum : null;
+    return { par, hcp };
+  });
 
-  applyParsedCourse(parsed);
-  setImportLoading(false);
-  document.getElementById('modal-import-course').classList.remove('active');
-  showToast('Scorecard imported — review and save');
-}
-
-// Open the Add Course modal in new-course mode and overwrite its fields.
-function applyParsedCourse(parsed) {
-  openAddCourse(); // new course mode — builds pars grid + default tee
-
-  document.getElementById('course-name-input').value = parsed.name || '';
-
-  for (let i = 0; i < 18; i++) {
-    const input = document.getElementById('par-' + i);
-    if (!input) continue;
-    const par = parsed.holes[i] && parsed.holes[i].par;
-    input.value = (par === 3 || par === 4 || par === 5) ? par : 4;
-  }
-
-  if (Array.isArray(parsed.tees) && parsed.tees.length) {
-    teesData = parsed.tees.map(t => ({
-      name: (t && t.name != null ? String(t.name) : ''),
+  // Tees: each needs a name + 18 numeric dists. Empty/missing → one Default tee.
+  let tees;
+  if (Array.isArray(obj.tees) && obj.tees.length) {
+    tees = obj.tees.map((t, i) => ({
+      name: (t && t.name != null && String(t.name).trim()) || ('Tee ' + (i + 1)),
       dists: normalizeImportDists(t && t.dists),
       isDefault: !!(t && t.isDefault),
     }));
-    if (!teesData.some(t => t.isDefault)) teesData[0].isDefault = true;
+    if (!tees.some(t => t.isDefault)) tees[0].isDefault = true;
+    // Exactly one default.
+    let seen = false;
+    tees.forEach(t => { if (t.isDefault && seen) t.isDefault = false; else if (t.isDefault) seen = true; });
   } else {
-    teesData = [{ name: 'Default', dists: Array(18).fill(0), isDefault: true }];
+    tees = [{ name: 'Default', dists: Array(18).fill(0), isDefault: true }];
   }
-  renderTeesContainer();
+
+  const name = (obj.name != null && String(obj.name).trim()) || 'Unnamed course';
+  const defaultTee = (tees.find(t => t.isDefault) || tees[0]).name;
+
+  return { ok: true, label: name, course: { name, holes, tees, defaultTee } };
+}
+
+// File-input handler: read each file, accept a course object or an array of them.
+async function onImportFilesPicked(fileList) {
+  hideImportError();
+  stagedCourses = [];
+  const files = Array.from(fileList || []);
+  if (!files.length) { renderImportResults(); return; }
+
+  for (const file of files) {
+    let parsed;
+    try {
+      const text = await file.text();
+      parsed = JSON.parse(text);
+    } catch (e) {
+      stagedCourses.push({ ok: false, error: 'Not valid JSON', label: file.name });
+      continue;
+    }
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    if (!items.length) {
+      stagedCourses.push({ ok: false, error: 'Empty file', label: file.name });
+      continue;
+    }
+    items.forEach(item => stagedCourses.push(validateImportedCourse(item)));
+  }
+
+  renderImportResults();
+  updateImportSaveBtn();
+}
+
+function renderImportResults() {
+  const el = document.getElementById('import-results');
+  if (!stagedCourses.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = '<div class="card">' + stagedCourses.map(r => {
+    if (r.ok) {
+      const par = r.course.holes.reduce((s, h) => s + h.par, 0);
+      const tCount = r.course.tees.length;
+      return `<div class="card-row" style="cursor:default">
+          <div>
+            <div class="card-label">${r.course.name}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px">Par ${par} · ${tCount} tee${tCount > 1 ? 's' : ''}</div>
+          </div>
+          <span class="tag" style="color:var(--green-bright);border-color:var(--green-dim)">✓ Ready</span>
+        </div>`;
+    }
+    return `<div class="card-row" style="cursor:default">
+        <div>
+          <div class="card-label">${r.label}</div>
+          <div style="font-size:12px;color:var(--text-dim);margin-top:2px">${r.error}</div>
+        </div>
+        <span class="tag" style="color:var(--red);border-color:#3a2020">✗ Skipped</span>
+      </div>`;
+  }).join('') + '</div>';
+}
+
+function updateImportSaveBtn() {
+  const validCount = stagedCourses.filter(r => r.ok).length;
+  const btn = document.getElementById('import-save-btn');
+  btn.disabled = validCount === 0;
+  btn.style.opacity = validCount === 0 ? '0.5' : '';
+  btn.textContent = validCount > 0
+    ? `Save ${validCount} Course${validCount > 1 ? 's' : ''}`
+    : 'Save Courses';
+}
+
+function saveImportedCourses() {
+  const valid = stagedCourses.filter(r => r.ok);
+  if (!valid.length) { showImportError('No valid courses to save.'); return; }
+
+  const courses = load(DB_KEY.courses);
+  const base = Date.now();
+  valid.forEach((r, i) => {
+    courses.push({ id: 'c_' + base + '_' + i, ...r.course }); // unique id per course
+  });
+  save(DB_KEY.courses, courses); // persists locally + queues Sheets sync
+
+  document.getElementById('modal-import-course').classList.remove('active');
+  renderCourses();
+  renderRoundSetup();
+  showToast(`${valid.length} course${valid.length > 1 ? 's' : ''} imported`);
 }
 
 // ════════════════════════════════════════════
