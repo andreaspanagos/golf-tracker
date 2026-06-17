@@ -666,6 +666,25 @@
   .round-item-stats { display: flex; gap: 12px; margin-top: 8px; }
   .round-item-stat { font-size: 12px; color: var(--text-dim); }
 
+  /* ── SYNC BADGE ── */
+  .sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    white-space: nowrap;
+    user-select: none;
+  }
+  .sync-badge.synced  { color: var(--green-bright); border-color: var(--green-dim); }
+  .sync-badge.syncing { color: var(--amber); }
+  .sync-badge.offline { color: var(--text-muted); }
+
 </style>
 </head>
 <body>
@@ -678,7 +697,8 @@
     <div>
       <div class="header-title">⛳ Golf Tracker</div>
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <div id="sync-badge" class="sync-badge" style="display:none" onclick="syncFromSheets()" title="Tap to sync now"></div>
       <div class="btn-icon" onclick="showScreen('screen-courses')" title="Courses">🏌️</div>
       <div class="btn-icon" onclick="showScreen('screen-settings')" title="Settings">⚙️</div>
     </div>
@@ -1053,7 +1073,178 @@ function load(key) {
 function loadObj(key, def = {}) {
   try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; }
 }
-function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+function save(key, val) {
+  localStorage.setItem(key, JSON.stringify(val));
+  // Sync layer: any collection write is queued for push to Google Sheets.
+  // (No-op when SHEETS_URL is empty — app stays purely localStorage.)
+  if (syncEnabled() && SYNC_ACTION[key]) {
+    markDirty(key);
+    scheduleFlush();
+  }
+}
+
+// ════════════════════════════════════════════
+// GOOGLE SHEETS SYNC  (Session 2)
+// ════════════════════════════════════════════
+//
+// Paste your deployed Apps Script web-app URL between the quotes below.
+// Leave it empty ('') to run offline-only with localStorage (original behaviour).
+// See SETUP.md for how to get this URL.
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbx7OGgdq7iJSqQ-yWr6vC8vgLtJjVw-PhJ5C7EkabI0-L6TKdrlwHCXyPexL1Fk3c7fEw/exec';
+
+// Which localStorage collections sync, and the backend action for each.
+const SYNC_ACTION = {
+  [DB_KEY.courses]:    'saveCourses',
+  [DB_KEY.rounds]:     'saveRounds',
+  [DB_KEY.settings]:   'saveSettings',
+  [DB_KEY.hcpHistory]: 'saveHcpHistory',
+};
+const PENDING_KEY = 'gt_sync_pending'; // collections still waiting to be pushed
+let flushTimer = null;
+
+function syncEnabled() { return !!SHEETS_URL; }
+
+// Write to localStorage WITHOUT queuing a push (used when applying remote data).
+function saveLocal(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+// ── pending (dirty) collection tracking, persisted so offline edits survive a reload ──
+function getPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; } catch { return []; }
+}
+function setPending(arr) { localStorage.setItem(PENDING_KEY, JSON.stringify([...new Set(arr)])); }
+function markDirty(key)  { if (SYNC_ACTION[key]) setPending([...getPending(), key]); }
+function clearDirty(key) { setPending(getPending().filter(k => k !== key)); }
+function isDirty(key)    { return getPending().includes(key); }
+
+function scheduleFlush() {
+  clearTimeout(flushTimer);
+  flushTimer = setTimeout(flushSync, 800); // debounce rapid edits
+}
+
+// Push a JSON payload to Sheets. Sent as text/plain + no-cors so the browser
+// never fires a CORS preflight; we treat "request sent" as success.
+function postToSheets(action, data) {
+  return fetch(SHEETS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, data }),
+  });
+}
+
+// Push every pending collection. Failures stay pending and retry later.
+async function flushSync() {
+  if (!syncEnabled()) return;
+  const pending = getPending();
+  if (pending.length === 0) { return; }
+  setSyncStatus('syncing');
+  let allOk = true;
+  for (const key of pending) {
+    const data = key === DB_KEY.settings ? getSettings() : load(key);
+    try {
+      await postToSheets(SYNC_ACTION[key], data);
+      clearDirty(key);
+    } catch (e) {
+      allOk = false; // offline / network error — keep queued
+    }
+  }
+  setSyncStatus(allOk ? 'synced' : 'offline');
+}
+
+// Merge two arrays of {id,...} records. preferNewer uses savedAt; otherwise
+// localWins decides id collisions. Never silently drops a record.
+function mergeById(local, remote, localWins, preferNewer) {
+  const map = new Map();
+  remote.forEach(x => { if (x && x.id) map.set(x.id, x); });
+  local.forEach(x => {
+    if (!x || !x.id) return;
+    const ex = map.get(x.id);
+    if (!ex) { map.set(x.id, x); return; }
+    if (preferNewer) map.set(x.id, (x.savedAt || 0) >= (ex.savedAt || 0) ? x : ex);
+    else if (localWins) map.set(x.id, x);
+  });
+  return [...map.values()];
+}
+
+// Pull from Sheets on load (and on demand): migrate first run, else merge + push.
+async function syncFromSheets() {
+  if (!syncEnabled()) return;
+  setSyncStatus('syncing');
+
+  let remote;
+  try {
+    const sep = SHEETS_URL.includes('?') ? '&' : '?';
+    const res = await fetch(SHEETS_URL + sep + 'action=getData', { method: 'GET' });
+    remote = await res.json();
+  } catch (e) {
+    setSyncStatus('offline'); // stay on local data
+    return;
+  }
+  if (!remote || remote.ok === false) { setSyncStatus('offline'); return; }
+
+  const remoteEmpty =
+    (remote.courses || []).length === 0 &&
+    (remote.rounds || []).length === 0 &&
+    (remote.hcpHistory || []).length === 0 &&
+    !(remote.settings && (remote.settings.name || remote.settings.handicap));
+
+  const localHasData =
+    load(DB_KEY.courses).length || load(DB_KEY.rounds).length || load(DB_KEY.hcpHistory).length;
+
+  // First-time migration: empty sheet but data on this device → push it all up.
+  if (remoteEmpty && localHasData) {
+    Object.keys(SYNC_ACTION).forEach(markDirty);
+    await flushSync();
+    renderCurrentScreen();
+    return;
+  }
+
+  // Merge remote into local (last-write-wins, keeping any unsynced local edits).
+  saveLocal(DB_KEY.courses,
+    mergeById(load(DB_KEY.courses), remote.courses || [], isDirty(DB_KEY.courses), false));
+  saveLocal(DB_KEY.rounds,
+    mergeById(load(DB_KEY.rounds), remote.rounds || [], isDirty(DB_KEY.rounds), true));
+
+  // Settings & HCP have no per-row id → remote wins unless we have unsynced edits.
+  if (!isDirty(DB_KEY.settings) && remote.settings) {
+    const merged = { ...getSettings(), ...remote.settings };
+    if (!merged.clubs || merged.clubs.length === 0) merged.clubs = getSettings().clubs;
+    saveLocal(DB_KEY.settings, merged);
+  }
+  if (!isDirty(DB_KEY.hcpHistory) && remote.hcpHistory) {
+    saveLocal(DB_KEY.hcpHistory, remote.hcpHistory);
+  }
+
+  renderCurrentScreen();
+  await flushSync(); // push anything still dirty (local edits newer than remote)
+  if (getPending().length === 0) setSyncStatus('synced');
+}
+
+// Re-render whichever screen is currently visible after data changes.
+function renderCurrentScreen() {
+  const active = document.querySelector('.screen.active');
+  if (!active) return;
+  if (active.id === 'screen-home') renderHome();
+  else if (active.id === 'screen-profile') renderProfile();
+  else if (active.id === 'screen-courses') renderCourses();
+  else if (active.id === 'screen-round-setup') renderRoundSetup();
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-badge');
+  if (!el) return;
+  if (!syncEnabled()) { el.style.display = 'none'; return; }
+  el.style.display = 'inline-flex';
+  const map = {
+    syncing: ['⟳ Syncing', 'syncing'],
+    synced:  ['✓ Synced',  'synced'],
+    offline: ['⚠ Offline', 'offline'],
+    idle:    ['• Local',   ''],
+  };
+  const [text, cls] = map[status] || map.idle;
+  el.textContent = text;
+  el.className = 'sync-badge ' + cls;
+}
 
 // Active round state
 let activeRound = null;  // { courseId, tee, date, weather, holes: [] }
@@ -1968,9 +2159,14 @@ function saveNewClub() {
 }
 
 function confirmClearData() {
-  if (confirm('Delete ALL rounds and courses? This cannot be undone.')) {
-    localStorage.removeItem(DB_KEY.rounds);
-    localStorage.removeItem(DB_KEY.courses);
+  const msg = syncEnabled()
+    ? 'Delete ALL rounds and courses everywhere (this device AND the cloud)? This cannot be undone.'
+    : 'Delete ALL rounds and courses? This cannot be undone.';
+  if (confirm(msg)) {
+    // Use save() (not removeItem) so the cleared state syncs up to Sheets too —
+    // otherwise it would just re-download on the next load.
+    save(DB_KEY.rounds, []);
+    save(DB_KEY.courses, []);
     showToast('Data cleared');
     showScreen('screen-home');
   }
@@ -2005,6 +2201,14 @@ function showToast(msg) {
 
 renderHome();
 setActiveTab('home');
+
+// ── Sync bootstrap ──
+setSyncStatus(syncEnabled() ? 'idle' : 'idle');
+syncFromSheets();                                   // pull latest + flush pending on load
+window.addEventListener('online', () => syncFromSheets());  // re-sync when signal returns
+document.addEventListener('visibilitychange', () => {       // re-sync when app refocused
+  if (!document.hidden) flushSync();
+});
 </script>
 </body>
 </html>
