@@ -1793,6 +1793,18 @@ async function parseScorecard() {
   hideImportError();
   setImportLoading(true);
 
+  // Shortcut: if input is already valid JSON, skip the API call entirely.
+  try {
+    const direct = JSON.parse(extractImportJson(text));
+    if (direct && Array.isArray(direct.holes) && direct.holes.length === 18) {
+      applyParsedCourse(direct);
+      setImportLoading(false);
+      document.getElementById('modal-import-course').classList.remove('active');
+      showToast('Scorecard imported — review and save');
+      return;
+    }
+  } catch (e) { /* not JSON — fall through to Claude */ }
+
   let parsed;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
