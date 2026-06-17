@@ -739,6 +739,15 @@
       <label class="form-label">Course Name</label>
       <input id="course-name-input" type="text" class="form-input" placeholder="e.g. Ullna Golf">
     </div>
+    <div class="form-group">
+      <label class="form-label">Default Tee</label>
+      <div class="toggle-grid toggle-grid-4" id="course-tee-grid">
+        <button class="toggle-btn selected" data-group="course-tee" data-val="yellow" onclick="selectToggle(this)">🟡 Yellow</button>
+        <button class="toggle-btn" data-group="course-tee" data-val="white" onclick="selectToggle(this)">⚪ White</button>
+        <button class="toggle-btn" data-group="course-tee" data-val="blue" onclick="selectToggle(this)">🔵 Blue</button>
+        <button class="toggle-btn" data-group="course-tee" data-val="red" onclick="selectToggle(this)">🔴 Red</button>
+      </div>
+    </div>
     <div class="section-title">Holes (Par · Distance m)</div>
     <div id="holes-setup-grid"></div>
     <div style="margin-top:16px">
@@ -966,7 +975,7 @@ function renderCourses() {
       <div class="course-item">
         <div onclick="openEditCourse('${c.id}')" style="flex:1">
           <div class="course-item-name">${c.name}</div>
-          <div class="course-item-meta">Par ${par} · ${dist}m</div>
+          <div class="course-item-meta">Par ${par} · ${dist}m · ${c.defaultTee || 'yellow'} tee</div>
         </div>
         <div class="course-item-actions">
           <span class="icon-btn" onclick="editCourse('${c.id}')">✏️</span>
@@ -1007,6 +1016,12 @@ function openAddCourse(id = null) {
   title.textContent = id ? 'Edit Course' : 'Add Course';
   nameInput.value = existingCourse ? existingCourse.name : '';
 
+  // Set default tee selection
+  const defaultTee = existingCourse ? (existingCourse.defaultTee || 'yellow') : 'yellow';
+  document.querySelectorAll('[data-group="course-tee"]').forEach(b => {
+    b.classList.toggle('selected', b.dataset.val === defaultTee);
+  });
+
   grid.innerHTML = Array.from({length: 18}, (_, i) => {
     const h = existingCourse ? existingCourse.holes[i] : null;
     return `
@@ -1024,6 +1039,8 @@ function saveCourse() {
   const name = document.getElementById('course-name-input').value.trim();
   if (!name) { alert('Enter a course name.'); return; }
 
+  const defaultTee = document.querySelector('.toggle-btn.selected[data-group="course-tee"]')?.dataset.val || 'yellow';
+
   const holes = [];
   for (let i = 0; i < 18; i++) {
     const par = parseInt(document.getElementById(`h-par-${i}`).value) || 4;
@@ -1033,10 +1050,10 @@ function saveCourse() {
 
   let courses = load(DB_KEY.courses);
   if (editingCourseId) {
-    courses = courses.map(c => c.id === editingCourseId ? { ...c, name, holes } : c);
+    courses = courses.map(c => c.id === editingCourseId ? { ...c, name, defaultTee, holes } : c);
     showToast('Course updated');
   } else {
-    courses.push({ id: 'c_' + Date.now(), name, holes });
+    courses.push({ id: 'c_' + Date.now(), name, defaultTee, holes });
     showToast('Course added');
   }
   save(DB_KEY.courses, courses);
@@ -1067,6 +1084,13 @@ function renderRoundSetup() {
 function onCourseChange() {
   const val = document.getElementById('round-course').value;
   document.getElementById('tee-group').style.display = val ? 'block' : 'none';
+  if (val) {
+    const courses = load(DB_KEY.courses);
+    const course = courses.find(c => c.id === val);
+    if (course && course.defaultTee) {
+      document.getElementById('round-tee').value = course.defaultTee;
+    }
+  }
 }
 
 function startRound() {
