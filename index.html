@@ -879,7 +879,10 @@
   <div class="header">
     <div class="btn-icon" onclick="showScreen('screen-home')">←</div>
     <div class="header-title">Courses</div>
-    <div class="btn-icon" onclick="openAddCourse()">+</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="btn-icon" onclick="openImportCourse()" title="Import from Scorecard">📋</div>
+      <div class="btn-icon" onclick="openAddCourse()" title="Add Course">+</div>
+    </div>
   </div>
   <div class="screen-body">
     <div id="courses-list"></div>
@@ -1074,6 +1077,24 @@
     <div style="margin-top:16px">
       <button class="btn btn-primary" onclick="saveCourse()">Save Course</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: IMPORT COURSE FROM SCORECARD
+══════════════════════════════════════════ -->
+<div id="modal-import-course" class="modal-overlay" onclick="closeModalOnBg(event,'modal-import-course')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Import from Scorecard</div>
+    <div class="form-group">
+      <label class="form-label">Scorecard</label>
+      <textarea id="import-scorecard-text" class="form-input" rows="8"
+        style="resize:vertical;line-height:1.4;font-family:inherit"
+        placeholder="Paste scorecard data here — any format works.&#10;e.g. copy from mingolf.se, type hole-by-hole,&#10;or describe the course in plain text."></textarea>
+    </div>
+    <div id="import-error" style="display:none;background:#2a1414;color:var(--red);border:1px solid #3a2020;border-radius:var(--radius-sm);padding:11px 13px;font-size:13px;line-height:1.4;margin-bottom:14px"></div>
+    <button class="btn btn-primary" id="import-parse-btn" onclick="parseScorecard()">Parse Scorecard →</button>
   </div>
 </div>
 
@@ -1682,6 +1703,159 @@ function saveCourse() {
   document.getElementById('modal-course').classList.remove('active');
   renderCourses();
   renderRoundSetup();
+}
+
+// ════════════════════════════════════════════
+// IMPORT COURSE FROM SCORECARD (Claude-powered)
+// ════════════════════════════════════════════
+
+const IMPORT_SYSTEM_PROMPT = `You are a golf scorecard parser. Extract course data from the user's input and return ONLY a valid JSON object with no other text, markdown, or explanation.
+
+The JSON must follow this exact structure:
+{
+  "name": "Course Name",
+  "holes": [
+    { "par": 4 },
+    ... 18 items total
+  ],
+  "tees": [
+    {
+      "name": "Yellow",
+      "dists": [365, 145, 520, ...],
+      "isDefault": true
+    }
+  ]
+}
+
+Rules:
+- holes array must always have exactly 18 items
+- Each hole has only a par (3, 4, or 5)
+- tees array has one entry per tee colour/name found in the input
+- dists array must have exactly 18 numbers (use 0 for any missing distances)
+- isDefault: true for the first/main tee only
+- If course name is not found, use empty string
+- If no distances found, return one tee with name 'Default' and all zeros
+- Return ONLY the JSON object, nothing else`;
+
+function openImportCourse() {
+  document.getElementById('import-scorecard-text').value = '';
+  hideImportError();
+  setImportLoading(false);
+  document.getElementById('modal-import-course').classList.add('active');
+}
+
+function hideImportError() {
+  const el = document.getElementById('import-error');
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+function showImportError(msg) {
+  const el = document.getElementById('import-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function setImportLoading(loading) {
+  const btn = document.getElementById('import-parse-btn');
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Reading…' : 'Parse Scorecard →';
+  btn.style.opacity = loading ? '0.6' : '';
+}
+
+// Pull a JSON object out of the model reply, tolerating stray fences/text.
+function extractImportJson(text) {
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) return fence[1].trim();
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) return text.slice(first, last + 1);
+  return text.trim();
+}
+
+// Coerce a tee's distances into exactly 18 finite numbers.
+function normalizeImportDists(dists) {
+  const out = Array(18).fill(0);
+  if (Array.isArray(dists)) {
+    for (let i = 0; i < 18; i++) {
+      const n = parseInt(dists[i], 10);
+      out[i] = Number.isFinite(n) ? n : 0;
+    }
+  }
+  return out;
+}
+
+const GENERIC_IMPORT_ERROR = "Couldn't read that scorecard. Try rephrasing or enter manually.";
+
+async function parseScorecard() {
+  const text = document.getElementById('import-scorecard-text').value.trim();
+  if (!text) { showImportError('Paste some scorecard text first.'); return; }
+  hideImportError();
+  setImportLoading(true);
+
+  let parsed;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: IMPORT_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: text }],
+      }),
+    });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const data = await res.json();
+    const reply = (data && data.content && data.content[0] && data.content[0].text) || '';
+    parsed = JSON.parse(extractImportJson(reply));
+  } catch (e) {
+    setImportLoading(false);
+    showImportError(GENERIC_IMPORT_ERROR);
+    return;
+  }
+
+  // Validate hole count before touching the form.
+  const holeCount = parsed && Array.isArray(parsed.holes) ? parsed.holes.length : 0;
+  if (holeCount !== 18) {
+    setImportLoading(false);
+    showImportError(`Parsed ${holeCount} holes — expected 18. Try adding more detail.`);
+    return;
+  }
+
+  applyParsedCourse(parsed);
+  setImportLoading(false);
+  document.getElementById('modal-import-course').classList.remove('active');
+  showToast('Scorecard imported — review and save');
+}
+
+// Open the Add Course modal in new-course mode and overwrite its fields.
+function applyParsedCourse(parsed) {
+  openAddCourse(); // new course mode — builds pars grid + default tee
+
+  document.getElementById('course-name-input').value = parsed.name || '';
+
+  for (let i = 0; i < 18; i++) {
+    const input = document.getElementById('par-' + i);
+    if (!input) continue;
+    const par = parsed.holes[i] && parsed.holes[i].par;
+    input.value = (par === 3 || par === 4 || par === 5) ? par : 4;
+  }
+
+  if (Array.isArray(parsed.tees) && parsed.tees.length) {
+    teesData = parsed.tees.map(t => ({
+      name: (t && t.name != null ? String(t.name) : ''),
+      dists: normalizeImportDists(t && t.dists),
+      isDefault: !!(t && t.isDefault),
+    }));
+    if (!teesData.some(t => t.isDefault)) teesData[0].isDefault = true;
+  } else {
+    teesData = [{ name: 'Default', dists: Array(18).fill(0), isDefault: true }];
+  }
+  renderTeesContainer();
 }
 
 // ════════════════════════════════════════════
