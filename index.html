@@ -955,6 +955,7 @@
         <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Par</div>
         <div class="hole-par" id="hole-par-display">4</div>
         <div class="hole-dist" id="hole-dist-display">—</div>
+        <div class="hole-dist" id="hole-shots-display" style="color:var(--green-bright)"></div>
       </div>
     </div>
 
@@ -1736,9 +1737,12 @@ function saveCourse() {
 // Expected JSON (one course per file, or an array of these):
 // {
 //   "name": "Ullna Golf Club",
-//   "holes": [ { "hole": 1, "par": 4, "hcp": 5 }, ... 18 items ],
-//   "tees":  [ { "name": "Yellow", "isDefault": true, "dists": [365,145,...18] }, ... ]
+//   "holes": [ { "hole": 1, "par": 4, "hcp": 5 }, ... 18 items ],   // hcp = stroke index 1–18
+//   "tees":  [ { "name": "Yellow", "isDefault": true,
+//               "slope": 132, "cr": 71.2,                          // WHS rating (for Stableford); optional
+//               "dists": [365,145,...18] }, ... ]
 // }
+// slope/cr power HCP-adjusted Stableford. If absent: slope→113, cr→par (Course HCP ≈ HI).
 
 let stagedCourses = []; // [{ ok, course?, error?, label }] from the last file selection
 
@@ -1798,19 +1802,26 @@ function validateImportedCourse(obj) {
   });
 
   // Tees: each needs a name + 18 numeric dists. Empty/missing → one Default tee.
+  // Optional WHS rating fields: slope (55–155, default 113) and cr / Course Rating.
   let tees;
   if (Array.isArray(obj.tees) && obj.tees.length) {
-    tees = obj.tees.map((t, i) => ({
-      name: (t && t.name != null && String(t.name).trim()) || ('Tee ' + (i + 1)),
-      dists: normalizeImportDists(t && t.dists),
-      isDefault: !!(t && t.isDefault),
-    }));
+    tees = obj.tees.map((t, i) => {
+      const slopeNum = t ? parseFloat(t.slope) : NaN;
+      const crNum = t ? parseFloat(t.cr) : NaN;
+      return {
+        name: (t && t.name != null && String(t.name).trim()) || ('Tee ' + (i + 1)),
+        dists: normalizeImportDists(t && t.dists),
+        slope: Number.isFinite(slopeNum) && slopeNum >= 55 && slopeNum <= 155 ? slopeNum : 113,
+        cr: Number.isFinite(crNum) && crNum > 0 && crNum < 100 ? crNum : null,
+        isDefault: !!(t && t.isDefault),
+      };
+    });
     if (!tees.some(t => t.isDefault)) tees[0].isDefault = true;
     // Exactly one default.
     let seen = false;
     tees.forEach(t => { if (t.isDefault && seen) t.isDefault = false; else if (t.isDefault) seen = true; });
   } else {
-    tees = [{ name: 'Default', dists: Array(18).fill(0), isDefault: true }];
+    tees = [{ name: 'Default', dists: Array(18).fill(0), slope: 113, cr: null, isDefault: true }];
   }
 
   const name = (obj.name != null && String(obj.name).trim()) || 'Unnamed course';
@@ -1938,6 +1949,83 @@ function onCourseChange() {
   }
 }
 
+// ════════════════════════════════════════════
+// STABLEFORD / HANDICAP SCORING
+// ════════════════════════════════════════════
+//
+// Stableford needs, per hole: par, stroke index (SI 1–18), and shots received.
+// Shots received come from the player's Course Handicap (full WHS), which needs
+// the Handicap Index (Profile) + the played tee's Slope Rating and Course Rating.
+
+// 18 stroke indices for a course. Uses stored holes[].hcp; if absent (manual
+// courses — SI is import-only for now), falls back to a default WHS-style
+// allocation (odd holes on the front, even on the back) so scoring still works.
+function getStrokeIndex(course) {
+  const stored = (course && course.holes) ? course.holes.map(h => h && h.hcp) : [];
+  if (stored.length === 18 && stored.every(v => Number.isFinite(v) && v >= 1 && v <= 18)) {
+    return { si: stored, estimated: false };
+  }
+  // Default allocation: 1,3,5,…,17 across front nine; 2,4,…,18 across back nine.
+  const si = [];
+  for (let i = 0; i < 9; i++)  si.push(2 * i + 1);
+  for (let i = 0; i < 9; i++)  si.push(2 * i + 2);
+  return { si, estimated: true };
+}
+
+// Full WHS Course Handicap, rounded to nearest integer. Returns null if no HI.
+function courseHandicap(hi, slope, cr, par) {
+  if (hi == null || !Number.isFinite(hi)) return null; // no HI → scratch Stableford
+  const s  = slope > 0 ? slope : 113;
+  const rt = Number.isFinite(cr) ? cr : par;           // CR falls back to par (note: isFinite(null) is true!)
+  return Math.round(hi * (s / 113) + (rt - par));
+}
+
+// Distribute Course Handicap across 18 holes by stroke index.
+// Handles CH > 18 (two+ shots on low-SI holes) and plus handicaps (negative CH).
+function shotsPerHole(ch, si /* [18] of 1..18 */) {
+  const out = Array(18).fill(0);
+  if (ch == null) return out;
+  const sign = ch >= 0 ? 1 : -1, mag = Math.abs(ch);
+  const base = Math.floor(mag / 18), rem = mag % 18;
+  for (let i = 0; i < 18; i++) {
+    let shots = base;
+    if (sign > 0 && si[i] <= rem)      shots += 1;     // hardest holes get the extra
+    if (sign < 0 && si[i] > 18 - rem)  shots += 1;     // plus-HCP gives back on easiest
+    out[i] = shots * sign;
+  }
+  return out;
+}
+
+// Stableford points for one hole. 0 if not played (gross 0/blank).
+function stablefordPoints(gross, par, shotsReceived) {
+  if (!gross) return 0;
+  const net = gross - shotsReceived;
+  return Math.max(0, (par - net) + 2);                 // net par=2, birdie=3, bogey=1, …
+}
+
+// Resolve the player's Handicap Index from settings as a number, or null.
+function playerHandicapIndex() {
+  const raw = getSettings().handicap;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Everything Stableford-related for a round: CH, per-hole shots/points, totals.
+// `tee` is the tee object played (for slope/cr); `holesState` is activeRound.holes
+// (or a completed round's holes); `course` supplies par + stroke index.
+function computeStableford(course, tee, holesState, hiOverride) {
+  const par = course.holes.reduce((s, h) => s + h.par, 0);
+  const hi = hiOverride !== undefined ? hiOverride : playerHandicapIndex();
+  const slope = tee && tee.slope > 0 ? tee.slope : 113;
+  const cr = tee && Number.isFinite(tee.cr) ? tee.cr : null;
+  const ch = courseHandicap(hi, slope, cr, par);
+  const { si, estimated } = getStrokeIndex(course);
+  const shots = shotsPerHole(ch, si);
+  const points = holesState.map((h, i) => stablefordPoints(h.strokes, course.holes[i].par, shots[i]));
+  const total = points.reduce((s, p) => s + p, 0);
+  return { handicapIndex: hi, courseHandicap: ch, slope, cr, si, siEstimated: estimated, shots, points, total };
+}
+
 function startRound() {
   const courseId = document.getElementById('round-course').value;
   if (!courseId) { showToast('Select a course first'); return; }
@@ -1950,6 +2038,12 @@ function startRound() {
   const date = document.getElementById('round-date').value;
   const weather = document.querySelector('.toggle-btn.selected[data-group="weather"]')?.dataset.val || '';
 
+  // Course Handicap snapshot for this round (depends on chosen tee + current HI).
+  const teeObj = (course.tees || []).find(t => t.name === tee) || (course.tees || [])[0] || null;
+  const par = course.holes.reduce((s, h) => s + h.par, 0);
+  const hi = playerHandicapIndex();
+  const ch = courseHandicap(hi, teeObj && teeObj.slope, teeObj && teeObj.cr, par);
+
   // Init active round
   activeRound = {
     id: 'r_' + Date.now(),
@@ -1957,6 +2051,8 @@ function startRound() {
     tee,
     date,
     weather,
+    handicapIndex: hi,       // snapshot — past rounds shouldn't shift if HI later changes
+    courseHandicap: ch,
     holes: Array.from({length: 18}, (_, i) => ({
       holeNum: i + 1,
       strokes: 0,
@@ -1968,6 +2064,8 @@ function startRound() {
     }))
   };
 
+  if (hi == null) showToast('Set your handicap in Profile for Stableford');
+
   currentHoleIdx = 0;
   loadHole(0);
   showScreen('screen-hole');
@@ -1976,6 +2074,32 @@ function startRound() {
 // ════════════════════════════════════════════
 // HOLE TRACKER
 // ════════════════════════════════════════════
+
+// Header sub-line: "Round: +N · M pts" plus the per-hole shots-received badge.
+function renderStablefordLive(course, idx) {
+  const totalStrokes = activeRound.holes.slice(0, idx).reduce((s, h) => s + h.strokes, 0);
+  const totalPar = course.holes.slice(0, idx).reduce((s, h) => s + h.par, 0);
+  const diff = totalStrokes - totalPar;
+  let scoreText = `Round: ${diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff)}`;
+
+  const activeTee = (course.tees || []).find(t => t.name === activeRound.tee) || (course.tees || [])[0] || null;
+  const sb = computeStableford(course, activeTee, activeRound.holes, activeRound.handicapIndex);
+  const shotsEl = document.getElementById('hole-shots-display');
+  if (sb.courseHandicap == null) {
+    shotsEl.textContent = '';   // no Handicap Index set → scratch (no extra shots to show)
+  } else {
+    const sh = sb.shots[idx];
+    const est = sb.siEstimated ? ' · SI est.' : '';
+    shotsEl.textContent = (sh > 0 ? `+${sh} shot${sh > 1 ? 's' : ''}` : '0 extra shots') + est;
+  }
+  // Running Stableford total — shown once any hole is scored (scratch points if no HI).
+  if (activeRound.holes.some(h => h.strokes > 0)) scoreText += ` · ${sb.total} pts`;
+  document.getElementById('hole-round-score').textContent = scoreText;
+}
+
+function updateRunningPoints(course) {
+  renderStablefordLive(course, currentHoleIdx);
+}
 
 function loadHole(idx) {
   const courses = load(DB_KEY.courses);
@@ -1998,11 +2122,8 @@ function loadHole(idx) {
   }
   document.getElementById('hole-dist-display').textContent = dist ? `${dist}m` : '—';
 
-  // Running score
-  const totalStrokes = activeRound.holes.slice(0, idx).reduce((s, h) => s + h.strokes, 0);
-  const totalPar = course.holes.slice(0, idx).reduce((s, h) => s + h.par, 0);
-  const diff = totalStrokes - totalPar;
-  document.getElementById('hole-round-score').textContent = `Round: ${diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff)}`;
+  // Running score + live Stableford (shots received + points total)
+  renderStablefordLive(course, idx);
 
   // Counters
   document.getElementById('strokes-val').textContent = holeState.strokes;
@@ -2042,9 +2163,10 @@ function renderProgress() {
 }
 
 function updateFIRGIR(par, holeState) {
-  const firContainer = document.querySelector('.two-col .form-group:first-child');
+  // The Fairway column is the block wrapping the FIR toggles (its grid's parent).
+  const firContainer = document.getElementById('fir-yes').closest('.toggle-grid').parentElement;
   // Hide FIR for par 3s
-  firContainer.style.visibility = par === 3 ? 'hidden' : 'visible';
+  if (firContainer) firContainer.style.visibility = par === 3 ? 'hidden' : 'visible';
 
   document.getElementById('fir-yes').classList.toggle('selected', holeState.fir === true);
   document.getElementById('fir-no').classList.toggle('selected', holeState.fir === false);
@@ -2060,6 +2182,7 @@ function adjustCounter(type, delta) {
     const courses = load(DB_KEY.courses);
     const course = courses.find(c => c.id === activeRound.courseId);
     updateScoreBadge(hole.strokes, course.holes[currentHoleIdx].par);
+    updateRunningPoints(course);          // refresh live Stableford total
   } else {
     hole.putts = Math.max(0, hole.putts + delta);
     document.getElementById('putts-val').textContent = hole.putts;
@@ -2243,6 +2366,16 @@ function renderSummaryContent(round, course) {
   const girCount = round.girCount !== undefined ? round.girCount : holes.filter(h => h.gir === true).length;
   const firCount = round.firCount !== undefined ? round.firCount : holes.filter(h => h.fir === true).length;
 
+  // Stableford (uses the round's HI snapshot if present, else current HI).
+  const teeObj = (course && course.tees && course.tees.length)
+    ? (course.tees.find(t => t.name === round.tee) || course.tees[0]) : null;
+  const sb = course ? computeStableford(course, teeObj, holes, round.handicapIndex) : null;
+  const shotsArr = sb ? sb.shots : Array(18).fill(0);
+  const ptsArr = sb ? sb.points : Array(18).fill(0);
+  const chDisplay = sb && sb.courseHandicap != null ? sb.courseHandicap : null;
+  const totalPts = sb ? sb.total : 0;
+  const net = (i, h) => (h.strokes ? h.strokes - shotsArr[i] : null);
+
   // Scorecard rows
   const frontNine = holes.slice(0, 9);
   const backNine = holes.slice(9, 18);
@@ -2250,6 +2383,12 @@ function renderSummaryContent(round, course) {
   const back9Par = courseHoles.slice(9, 18).reduce((s, h) => s + h.par, 0);
   const front9Score = frontNine.reduce((s, h) => s + h.strokes, 0);
   const back9Score = backNine.reduce((s, h) => s + h.strokes, 0);
+  const front9Pts = ptsArr.slice(0, 9).reduce((s, p) => s + p, 0);
+  const back9Pts = ptsArr.slice(9, 18).reduce((s, p) => s + p, 0);
+  const sumNet = (arr, start) => arr.reduce((s, h, j) => s + (h.strokes ? h.strokes - shotsArr[start + j] : 0), 0);
+  const front9Net = sumNet(frontNine, 0);
+  const back9Net = sumNet(backNine, 9);
+  const totalNet = front9Net + back9Net;
 
   function scoreClass(strokes, par) {
     if (!strokes) return '';
@@ -2262,15 +2401,20 @@ function renderSummaryContent(round, course) {
   }
 
   function scorecardRows(holeArr, parArr, startIdx) {
-    return holeArr.map((h, i) => `
+    return holeArr.map((h, i) => {
+      const gi = startIdx + i;
+      const n = net(gi, h);
+      return `
       <tr>
-        <td>${startIdx + i + 1}</td>
+        <td>${gi + 1}</td>
         <td>${parArr[i].par}</td>
-        <td>${teeDists[startIdx + i] || '—'}</td>
+        <td>${teeDists[gi] || '—'}</td>
         <td class="sc-score ${scoreClass(h.strokes, parArr[i].par)}">${h.strokes || '—'}</td>
+        <td>${n == null ? '—' : n}</td>
+        <td class="sc-score">${h.strokes ? ptsArr[gi] : '—'}</td>
         <td>${h.putts || '—'}</td>
-        <td style="font-size:11px">${h.gir === true ? '✓' : h.gir === false ? '✗' : '—'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
   const d = new Date(round.date || Date.now());
@@ -2289,16 +2433,23 @@ function renderSummaryContent(round, course) {
       <div class="stat-card"><div class="stat-value">${firCount}/14</div><div class="stat-label">FIR</div></div>
       <div class="stat-card"><div class="stat-value">${coursePar}</div><div class="stat-label">Course Par</div></div>
     </div>
+    ${sb ? `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${totalPts}</div><div class="stat-label">Stableford Pts${chDisplay == null ? ' · scratch' : ''}</div></div>
+      ${chDisplay != null
+        ? `<div class="stat-card"><div class="stat-value">${chDisplay}</div><div class="stat-label">Course HCP${sb.siEstimated ? ' · SI est.' : ''}</div></div>`
+        : `<div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Set HI in Profile</div></div>`}
+    </div>` : ''}
     <div class="section-title">Scorecard</div>
     <div class="scorecard">
       <table class="scorecard-table">
-        <thead><tr><th>H</th><th>Par</th><th>m</th><th>Score</th><th>Putts</th><th>GIR</th></tr></thead>
+        <thead><tr><th>H</th><th>Par</th><th>m</th><th>Score</th><th>Net</th><th>Pts</th><th>Putts</th></tr></thead>
         <tbody>
           ${scorecardRows(frontNine, courseHoles.slice(0, 9), 0)}
-          <tr class="sc-out-row"><td>OUT</td><td>${front9Par}</td><td>—</td><td>${front9Score || '—'}</td><td>${frontNine.reduce((s,h)=>s+h.putts,0)||'—'}</td><td>—</td></tr>
+          <tr class="sc-out-row"><td>OUT</td><td>${front9Par}</td><td>—</td><td>${front9Score || '—'}</td><td>${front9Net || '—'}</td><td>${front9Pts || '—'}</td><td>${frontNine.reduce((s,h)=>s+h.putts,0)||'—'}</td></tr>
           ${scorecardRows(backNine, courseHoles.slice(9, 18), 9)}
-          <tr class="sc-out-row"><td>IN</td><td>${back9Par}</td><td>—</td><td>${back9Score||'—'}</td><td>${backNine.reduce((s,h)=>s+h.putts,0)||'—'}</td><td>—</td></tr>
-          <tr class="sc-out-row"><td>TOT</td><td>${coursePar}</td><td>—</td><td>${totalScore||'—'}</td><td>${totalPutts||'—'}</td><td>${girCount}</td></tr>
+          <tr class="sc-out-row"><td>IN</td><td>${back9Par}</td><td>—</td><td>${back9Score||'—'}</td><td>${back9Net || '—'}</td><td>${back9Pts || '—'}</td><td>${backNine.reduce((s,h)=>s+h.putts,0)||'—'}</td></tr>
+          <tr class="sc-out-row"><td>TOT</td><td>${coursePar}</td><td>—</td><td>${totalScore||'—'}</td><td>${totalNet || '—'}</td><td>${totalPts || '—'}</td><td>${totalPutts||'—'}</td></tr>
         </tbody>
       </table>
     </div>`;
@@ -2316,6 +2467,10 @@ function finishRound() {
   const girCount = activeRound.holes.filter(h => h.gir === true).length;
   const firCount = activeRound.holes.filter(h => h.fir === true).length;
 
+  // Stableford snapshot (HI + Course Handicap were fixed at round start).
+  const teeObj = course ? (course.tees || []).find(t => t.name === activeRound.tee) || (course.tees || [])[0] : null;
+  const sb = course ? computeStableford(course, teeObj, activeRound.holes, activeRound.handicapIndex) : null;
+
   const completedRound = {
     ...activeRound,
     totalScore,
@@ -2323,6 +2478,9 @@ function finishRound() {
     girCount,
     firCount,
     coursePar,
+    handicapIndex: activeRound.handicapIndex,
+    courseHandicap: activeRound.courseHandicap,
+    stablefordPoints: sb ? sb.total : 0,
     savedAt: Date.now()
   };
 
